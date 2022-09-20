@@ -39,6 +39,7 @@
     "assert": "npm:assert-browserify",
     "buffer": "npm:buffer-browserify",
     "crypto": "npm:crypto-browserify",
-    "github-markdown-css": "^5.1.0"
+    "github-markdown-css": "^5.1.0",
+    "react-select": "^5.4.0"
   }
 }
