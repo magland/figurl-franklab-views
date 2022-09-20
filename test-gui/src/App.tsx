@@ -48,7 +48,7 @@ function App() {
         <h2>This page is not being embedded as a figurl figure.</h2>
         <h3>Here are some examples you may want to try:</h3>
         <ul>
-          <li><a href="https://www.figurl.org/f?v=http://localhost:3000&d=sha1://5be70cba528fb561f791b8a777410c045994cf1b&label=Autocorrelograms%20example&s={}">autocorrelograms</a></li>
+          <li><a href="https://www.figurl.org/f?v=http://localhost:3000&d=sha1://c7e0ae023c4c75d9ae85078e459d7fc8daa1224d&label=Track%20position%20animation%20example&s={}">Track animation</a></li>
         </ul>
       </div>
     )
