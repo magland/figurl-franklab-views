@@ -1,12 +1,12 @@
-import { MuiThemeProvider } from '@material-ui/core';
-import { getFigureData, SetupUrlState, startListeningToParent } from '@figurl/interface';
 import { useWindowDimensions } from '@figurl/core-utils';
+import { getFigureData, SetupUrlState, startListeningToParent } from '@figurl/interface';
+import { defaultUnitSelection, UnitSelectionContext, unitSelectionReducer } from '@figurl/spike-sorting-views';
+import { defaultRecordingSelection, RecordingSelectionContext, recordingSelectionReducer, SetupAnnotations } from '@figurl/timeseries-views';
+import { MuiThemeProvider } from '@material-ui/core';
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import './localStyles.css';
 import theme from './theme';
 import View from './View';
-import { defaultRecordingSelection, RecordingSelectionContext, recordingSelectionReducer, SetupAnnotations } from '@figurl/timeseries-views';
-import { defaultUnitSelection, UnitSelectionContext, unitSelectionReducer } from '@figurl/spike-sorting-views';
 
 const urlSearchParams = new URLSearchParams(window.location.search)
 const queryParams = Object.fromEntries(urlSearchParams.entries())
@@ -49,6 +49,7 @@ function App() {
         <h3>Here are some examples you may want to try:</h3>
         <ul>
           <li><a href="https://www.figurl.org/f?v=http://localhost:3000&d=sha1://c7e0ae023c4c75d9ae85078e459d7fc8daa1224d&label=Track%20position%20animation%20example&s={}">Track animation</a></li>
+          <li><a href="https://www.figurl.org/f?v=http://localhost:3000&d=sha1://f52d6528206a962d810e6276df7141563eb315b6&label=Linear%20Position%20Data">Linear position decode</a></li>
         </ul>
       </div>
     )
