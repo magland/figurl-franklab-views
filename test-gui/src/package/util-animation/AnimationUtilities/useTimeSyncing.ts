@@ -72,7 +72,6 @@ export const liveSyncFrameToOutsideTime = (props: liveSyncFrameToOutsideTimeProp
 const timeUpdater: DebounceThrottleUpdater<debounceUpdateProps, debounceUpdateRefs> = (refs, state) => {
     if (state.currentTime === refs.targetExternalTimeRef.current) return false
     refs.targetExternalTimeRef.current = state.currentTime
-    console.log(`Setting target external time to ${refs.targetExternalTimeRef.current} (that ref is ${refs.targetExternalTimeRef})`)
     return true
 }
 const timeResolver: DebounceThrottleResolver<debounceUpdateRefs, debounceUpdateResolverProps> = (refs, props) => {
