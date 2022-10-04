@@ -4,7 +4,7 @@ import { matrix, Matrix, multiply, transpose } from 'mathjs'
 import React, { FunctionComponent, useEffect, useMemo } from "react"
 // import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useLiveTimeSyncing, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
 import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useSynchronizedTime, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
-import { useEpsilonChecker, useFrameMatchingTime } from '../util-animation/AnimationUtilities/useSynchronizedTime'
+// import { useEpsilonChecker, useFrameMatchingTime } from '../util-animation/AnimationUtilities/useSynchronizedTime'
 import TPADecodedPositionLayer, { useConfiguredDecodedPositionDrawFunction } from './TPADecodedPositionLayer'
 import { getDecodedPositionFramePx, useProbabilityFrames, useProbabilityLocationsMap } from './TPADecodedPositionLogic'
 import TPAPositionLayer from './TPAPositionLayer'
@@ -152,9 +152,9 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
     // const { handleOutsideTimeUpdate, handleFrameTimeUpdate } = useLiveTimeSyncing(setTimeFocus, animationState, animationStateDispatch, getTimeFromFrame)
     // useEffect(() => handleOutsideTimeUpdate(focusTime), [handleOutsideTimeUpdate, focusTime])
     // useEffect(() => handleFrameTimeUpdate(), [handleFrameTimeUpdate])
-    const frameChecker = useFrameMatchingTime(animationState, getTimeFromFrame)
-    const epsilonChecker = useEpsilonChecker(getTimeFromFrame)
-    const syncTime = useSynchronizedTime(setTimeFocus, animationStateDispatch, getTimeFromFrame, frameChecker, epsilonChecker)
+    const knownTimes = useMemo(() => animationState.frameData.map(d => getTimeFromFrame(d)), [animationState.frameData])
+    // const frameChecker = useFrameMatchingTime(animationState, getTimeFromFrame)
+    const syncTime = useSynchronizedTime(setTimeFocus, animationStateDispatch, getTimeFromFrame, knownTimes)
     useEffect(() => {
         syncTime(animationState, focusTime)
     }, [syncTime, animationState, focusTime])
