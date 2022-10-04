@@ -2,7 +2,9 @@ import { Margins, TwoDTransformProps, use2DTransformationMatrix, useAspectTrimmi
 import { useRecordingSelectionTimeInitialization, useTimeFocus } from '@figurl/timeseries-views'
 import { matrix, Matrix, multiply, transpose } from 'mathjs'
 import React, { FunctionComponent, useEffect, useMemo } from "react"
-import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useLiveTimeSyncing, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
+// import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useLiveTimeSyncing, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
+import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useSynchronizedTime, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
+import { useEpsilonChecker, useFrameMatchingTime } from '../util-animation/AnimationUtilities/useSynchronizedTime'
 import TPADecodedPositionLayer, { useConfiguredDecodedPositionDrawFunction } from './TPADecodedPositionLayer'
 import { getDecodedPositionFramePx, useProbabilityFrames, useProbabilityLocationsMap } from './TPADecodedPositionLogic'
 import TPAPositionLayer from './TPAPositionLayer'
@@ -147,9 +149,15 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
 
     const { focusTime, setTimeFocus } = useTimeFocus()  // state imported from recording context
 
-    const { handleOutsideTimeUpdate, handleFrameTimeUpdate } = useLiveTimeSyncing(setTimeFocus, animationState, animationStateDispatch, getTimeFromFrame)
-    useEffect(() => handleOutsideTimeUpdate(focusTime), [handleOutsideTimeUpdate, focusTime])
-    useEffect(() => handleFrameTimeUpdate(), [handleFrameTimeUpdate])
+    // const { handleOutsideTimeUpdate, handleFrameTimeUpdate } = useLiveTimeSyncing(setTimeFocus, animationState, animationStateDispatch, getTimeFromFrame)
+    // useEffect(() => handleOutsideTimeUpdate(focusTime), [handleOutsideTimeUpdate, focusTime])
+    // useEffect(() => handleFrameTimeUpdate(), [handleFrameTimeUpdate])
+    const frameChecker = useFrameMatchingTime(animationState, getTimeFromFrame)
+    const epsilonChecker = useEpsilonChecker(getTimeFromFrame)
+    const syncTime = useSynchronizedTime(setTimeFocus, animationStateDispatch, getTimeFromFrame, frameChecker, epsilonChecker)
+    useEffect(() => {
+        syncTime(animationState, focusTime)
+    }, [syncTime, animationState, focusTime])
 
     useTimeWindowSyncing(animationState, animationStateDispatch, getTimeFromFrame)
 
