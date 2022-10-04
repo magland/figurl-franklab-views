@@ -1,17 +1,8 @@
-import { TwoDTransformProps, use2DTransformationMatrix, useAspectTrimming } from '@figurl/core-views'
-import { Margins } from '@figurl/core-views'
+import { Margins, TwoDTransformProps, use2DTransformationMatrix, useAspectTrimming } from '@figurl/core-views'
 import { useRecordingSelectionTimeInitialization, useTimeFocus } from '@figurl/timeseries-views'
 import { matrix, Matrix, multiply, transpose } from 'mathjs'
-import React, { FunctionComponent, useCallback, useEffect, useMemo } from "react"
-import { BOOKMARK_BUTTON } from '../util-animation'
-import { CROP_BUTTON } from '../util-animation'
-import { PlaybackOptionalButtons } from '../util-animation'
-import { SYNC_BUTTON } from '../util-animation'
-import { useUrlPlaybackWindowSupport } from '../util-animation'
-import { AnimationStateReducer, AnimationState, AnimationStateAction, makeDefaultState } from '../util-animation'
-import { useLiveTimeSyncing } from '../util-animation'
-import { useTimeWindowSyncing } from '../util-animation'
-import { FrameAnimation, AnimationOptionalFeatures } from '../util-animation'
+import React, { FunctionComponent, useEffect, useMemo } from "react"
+import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useLiveTimeSyncing, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
 import TPADecodedPositionLayer, { useConfiguredDecodedPositionDrawFunction } from './TPADecodedPositionLayer'
 import { getDecodedPositionFramePx, useProbabilityFrames, useProbabilityLocationsMap } from './TPADecodedPositionLogic'
 import TPAPositionLayer from './TPAPositionLayer'
@@ -126,6 +117,7 @@ const useDrawingSpace = (width: number, drawHeight: number, xmax: number, xmin: 
 
 type TPAReducer = React.Reducer<AnimationState<PositionFrame>, AnimationStateAction<PositionFrame>>
 const initialState = makeDefaultState<PositionFrame>()
+const getTimeFromFrame = (frame: PositionFrame | undefined) => frame?.timestamp ?? -1
 
 const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps> = (props: TrackPositionAnimationProps) => {
     const { data, width, height } = props
@@ -154,7 +146,6 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
     }, [dataFrames])
 
     const { focusTime, setTimeFocus } = useTimeFocus()  // state imported from recording context
-    const getTimeFromFrame = useCallback((frame: PositionFrame | undefined) => frame?.timestamp ?? -1, [])
 
     const { handleOutsideTimeUpdate, handleFrameTimeUpdate } = useLiveTimeSyncing(setTimeFocus, animationState, animationStateDispatch, getTimeFromFrame)
     useEffect(() => handleOutsideTimeUpdate(focusTime), [handleOutsideTimeUpdate, focusTime])
