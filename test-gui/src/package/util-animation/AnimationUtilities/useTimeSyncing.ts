@@ -1,7 +1,7 @@
-import { AnimationState, AnimationStateAction } from "../../util-animation"
 import { BstSearchFn, BstSearchResult, useBinarySearchTree } from "@figurl/core-utils"
-import { DebounceThrottleResolver, DebounceThrottleUpdater, useThrottler } from "../../util-rate-limiters"
 import React, { useCallback, useMemo, useRef } from "react"
+import { AnimationState, AnimationStateAction } from "../../util-animation"
+import { DebounceThrottleResolver, DebounceThrottleUpdater, useThrottler } from "../../util-rate-limiters"
 
 
 type TimeLookupFn = (time: number) => BstSearchResult<number> | undefined
@@ -76,7 +76,6 @@ const timeUpdater: DebounceThrottleUpdater<debounceUpdateProps, debounceUpdateRe
 }
 const timeResolver: DebounceThrottleResolver<debounceUpdateRefs, debounceUpdateResolverProps> = (refs, props) => {
     // It looks like this is actually getting called too often--not sure what's going on there.
-    // console.log(`Updating time, it is ${Date.now()}`)
     props.committer(refs.targetExternalTimeRef.current, props.setterFn)
 }
 
@@ -109,8 +108,8 @@ const useLiveTimeSyncing = <T, >(setExternalTime: timeSetter, state: AnimationSt
 
     const handleFrameTimeUpdate = useCallback(() => {
         const internalTime = getTimeFromFrame(state?.frameData[state?.currentFrameIndex])
-        state.isPlaying ? throttledSyncOutsideTimeToFrameTime({currentTime: internalTime}) : syncOutsideTimeToFrameTime(internalTime, setExternalTime)
-    }, [getTimeFromFrame, state.isPlaying, state.frameData, state.currentFrameIndex, throttledSyncOutsideTimeToFrameTime, setExternalTime])
+        throttledSyncOutsideTimeToFrameTime({currentTime: internalTime})
+    }, [getTimeFromFrame, state.frameData, state.currentFrameIndex, throttledSyncOutsideTimeToFrameTime])
 
     return { handleOutsideTimeUpdate, handleFrameTimeUpdate }
 }

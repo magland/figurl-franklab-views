@@ -2,6 +2,7 @@
   "name": "test-gui",
   "version": "0.1.0",
   "private": true,
+  "homepage": "./",
   "dependencies": {
     "@figurl/core-views": "^0.1",
     "@figurl/interface": "^0.1",

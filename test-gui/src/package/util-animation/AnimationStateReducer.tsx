@@ -371,12 +371,12 @@ const doSkip = <T, >(s: AnimationState<T>, a: AnimationStateSkipAction): Animati
 
     const newFrame = s.currentFrameIndex + (frameSkipCount * (backward ? -1 : 1))
 
-    s.currentFrameIndex = newFrame < s.window[0]
+    const targetFrameIndex = newFrame < s.window[0]
         ? s.window[0]
         : newFrame > s.window[1]
             ? s.window[1] : newFrame
     // refreshAnimationCycle(s)
-    return {...s, playbackStartedTimestamp: undefined}
+    return {...s, currentFrameIndex: targetFrameIndex, playbackStartedTimestamp: undefined}
 }
 
 export default AnimationStateReducer
