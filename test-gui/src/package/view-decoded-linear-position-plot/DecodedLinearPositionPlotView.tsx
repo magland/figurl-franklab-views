@@ -296,8 +296,20 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         canvas.height = positionsKey.length + 1
         const c = canvas.getContext('2d')
         if (!c) return
-        const maxVal = Math.max(...(visibleLines.map(l => l.max ?? 0)))
-        const minVal = Math.min(...(visibleLines.map(l => l.min ?? 255)))
+        // // This blows up the stack :(
+        // const maxVal = Math.max(...(visibleLines.map(l => l.max ?? 0)))
+        // const minVal = Math.min(...(visibleLines.map(l => l.min ?? 255)))
+        let maxVal = 0
+        let minVal = 255
+        visibleLines.forEach(l => {
+            if (l.max !== undefined) {
+                maxVal = maxVal < l.max ? l.max : maxVal
+            }
+            if (l.min !== undefined) {
+                minVal = minVal > l.min ? l.min : minVal
+            }
+        })
+
         const colorFn = getColorForValueFnString(minVal, maxVal)
         const emptyStyle = colorFn(0)
         // TODO: memoize the styles or sth? Combine lines in a prepass to avoid context switches?
@@ -305,6 +317,7 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         c.fillStyle = emptyStyle
         c.fillRect(0, 0, canvas.width, canvas.height)
         visibleLines.forEach((l, i) => {
+            if (i < 10) console.log(`Printing run ${i} which is ${JSON.stringify(l)} with ${l.valueRects.size} entries`)
             for (const [probability, runs] of l.valueRects) {
                 c.strokeStyle = colorFn(probability)
                 if (runs === undefined || runs.length === 0) continue
