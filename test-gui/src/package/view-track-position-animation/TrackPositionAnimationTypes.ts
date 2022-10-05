@@ -152,7 +152,11 @@ export const isDecodedPositionData = (x: any): x is DecodedPositionData => {
         if (!candidate.values || !candidate.locations || !candidate.frameBounds) return false // if any list is defined, all must be defined
         const valuesLocationsLengthsMatch = candidate.values.length === candidate.locations.length
         const frameBoundsAccountForAllValues = candidate.values.length === candidate.frameBounds.reduce((sum, item) => sum + item, 0)
-        return valuesLocationsLengthsMatch && frameBoundsAccountForAllValues
+        if (!frameBoundsAccountForAllValues) {
+            console.warn(`IGNORING FOR NOW: Frame bounds do not account for all values. ${candidate.values.length} <> ${candidate.frameBounds.reduce((sum, item) => sum + item, 0)}`)
+        }
+        // return valuesLocationsLengthsMatch && frameBoundsAccountForAllValues
+        return valuesLocationsLengthsMatch
     }
 
     return false
