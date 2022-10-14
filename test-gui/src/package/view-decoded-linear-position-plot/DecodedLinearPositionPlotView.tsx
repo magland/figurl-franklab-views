@@ -1,8 +1,11 @@
 import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useRecordingSelectionTimeInitialization, useTimeRange, useTimeseriesMargins } from '@figurl/timeseries-views'
 import { Checkbox } from '@material-ui/core'
 import { FunctionComponent, useCallback, useMemo, useState } from 'react'
+import { inferno, magma, plasma, viridis } from 'scale-color-perceptual'
+import { ValidColorMap } from '../view-track-position-animation/TPADecodedPositionLayer'
 import { DecodedLinearPositionPlotData } from './DecodedLinearPositionPlotViewData'
 // import { TimeseriesLayoutOpts } from '@figurl/timeseries-views'
+const COLOR_MAP_CHOICE: ValidColorMap | undefined = 'viridis'
 
 // THIS SHOULD BE AN IMPORT FROM TIMESERIES-VIEWS
 type TimeseriesLayoutOpts = {
@@ -28,7 +31,7 @@ const emptyPanelSelection = new Set<number | string>()
 // We will potentially be doing this a lot, and supposedly the good old for-loop is more
 // performant than doing array-copy slicing and/or fancy reduce tricks.
 const sumRange = (array: number[], startInclusive: number, endExclusive: number): number => {
-    let end = min([endExclusive, array.length]) || 0
+    let end = Math.min(endExclusive, array.length) || 0
     let res = 0
     for (let i = startInclusive; i < end; i++) {
         res += array[i]
@@ -42,35 +45,87 @@ type DownsampledData = {
     downsampledPositions: number[],
     downsampledTimes: number[]
 }
-// If nothing else, I'm sure we could accomplish this with a linear transform, BUT AGAIN the entire premise
-// is that the dense-matrix representation won't fit comfortably in memory.
-// I suppose we could do like, chunks over it?
-// TODO: Probably that
-// Anyway this is summing over the samples, but we could also average, or do something actually sophisticated
-const downsample = (values: number[], positions: number[], times: number[], framesPerPixel: number): DownsampledData => {
-    let nextIncompleteTimeIndex = 0
+/*
+// Currently unused. Would dynamically fit the visible time points into the available onscreen canvas.
+const dynamicDownsample = (values: number[], positions: number[], times: number[], framesPerPixel: number): DownsampledData => {
     let runningTimeIndexTotal = 0
-    let nextIncompleteDataIndex = 0
+    let nextUnprocessedTimeIndex = 0
+    let nextUnprocessedDataIndex = 0
     const results: DownsampledData = { downsampledValues: [], downsampledPositions: [], downsampledTimes: [] }
     while (runningTimeIndexTotal < times.length) {
         runningTimeIndexTotal += framesPerPixel
-        const thisFrameLength = Math.floor(runningTimeIndexTotal - nextIncompleteTimeIndex)
-        const dataIndicesThisChunk = sumRange(times, nextIncompleteTimeIndex, nextIncompleteTimeIndex + thisFrameLength + 1)
+        const thisFrameLength = Math.floor(runningTimeIndexTotal - nextUnprocessedTimeIndex)
+        const dataIndicesThisChunk = sumRange(times, nextUnprocessedTimeIndex, nextUnprocessedTimeIndex + thisFrameLength + 1)
         const chunkData: Map<number, number> = new Map()
-        for (let i = nextIncompleteDataIndex; i < i + dataIndicesThisChunk; i++) {
+        for (let i = nextUnprocessedDataIndex; i < i + dataIndicesThisChunk; i++) {
             const p = positions[i]
             chunkData.set(p, (chunkData.get(p) ?? 0) + values[i])
         }
         results.downsampledTimes.push(chunkData.size)
         chunkData.forEach((value, key) => {
             results.downsampledPositions.push(key)
-            results.downsampledValues.push(value)
+            // The value for this spot will be the round-up average over the range of compressed time frames.
+            results.downsampledValues.push(Math.ceil(value / thisFrameLength))
         })
-        nextIncompleteDataIndex += dataIndicesThisChunk
-        nextIncompleteTimeIndex += thisFrameLength
+        nextUnprocessedDataIndex += dataIndicesThisChunk
+        nextUnprocessedTimeIndex += thisFrameLength
     }
 
     return results
+}
+*/
+
+const computeScaleFactor = (baseScaleFactor: number, visibleRangeCount: number, maxRangeCount: number) => {
+    // We want x, the smallest power of base s.t. (the visible range) * base^x > full range.
+    // So if we have 2000 columns visible and can display up to 750, with base scaling of 3, we would need
+    // to compress 27x (3^3) so that 27 native columns make up every display column.
+    const exponent = Math.ceil(Math.log(visibleRangeCount/maxRangeCount)/Math.log(baseScaleFactor))
+    return Math.max(Math.pow(baseScaleFactor, exponent), 1)
+}
+
+const staticDownsample = (values: number[], positions: number[], times: number[], scaleFactor: number): DownsampledData => {
+    const results: DownsampledData = { downsampledValues: [], downsampledPositions: [], downsampledTimes: [] }
+    if (scaleFactor === 1) {
+        return {downsampledValues: values, downsampledPositions: positions, downsampledTimes: times}
+    }
+    let firstUnfinishedDataPoint = 0
+    for (let i = 0; i < times.length; i += scaleFactor) {
+        const chunkData: Map<number, number> = new Map()
+        const pointCountThisChunk = sumRange(times, i, i + scaleFactor)
+        for (let j = firstUnfinishedDataPoint; j < firstUnfinishedDataPoint + pointCountThisChunk; j++) {
+            const p = positions[j]
+            chunkData.set(p, (chunkData.get(p) ?? 0) + values[j])
+        }
+        results.downsampledTimes.push(chunkData.size)
+        chunkData.forEach((value, key) => {
+            results.downsampledPositions.push(key)
+            results.downsampledValues.push(Math.ceil(value / scaleFactor))
+        })
+        firstUnfinishedDataPoint += pointCountThisChunk
+    }
+    return results
+}
+
+const getDownsampledRange = (scaleFactor: number, firstSelected: number, lastSelected: number) => {
+    // Assume native indices start from 0
+    return {
+        downsampledStart: Math.floor(firstSelected / scaleFactor),
+        downsampledEnd: Math.ceil(lastSelected / scaleFactor)
+    }
+}
+
+const downsampleObservedPositions = (scaleFactor: number, positions: number[]): DownsampledData => {
+    // TODO: Fixme to match actual data
+    // For now, assume that the observed position data comes in as a 1-d series with the same indices as the main time-based series.
+    if (scaleFactor < 1) {
+        console.warn(`Attempt to use scale factor of less than 1 in downsampling observed position. Don't do that.`)
+        return {downsampledPositions: [], downsampledTimes: [], downsampledValues: []}
+    }
+    // TODO: probably should check for non-integer scalefactor
+    // TODO: NEED TO CONVERT POSITIONS TO INDICES! Otherwise positions parameter works as-is
+    const values = Array.from({length: positions.length}, () => 255)
+    const times = Array.from({length: positions.length}, () => 1)
+    return staticDownsample(values, positions, times, scaleFactor)
 }
 
 
@@ -78,11 +133,7 @@ type Run = {
     start: number,
     end?: number
 }
-type TimeColumn = {
-    valueRects: Map<number, Run[]>,
-    min?: number,
-    max?: number
-}
+type TimeColumn = Map<number, Run[]>
 
 const argsort = (ary: number[], offset?: number): number[] => {
     const decorated = ary.map((v, i) => [v, i])
@@ -105,19 +156,20 @@ const closeRuns = (valueRects: Map<number, Run[]>, closingPosition: number, clos
     const start = closeAboveThisNumber ?? 0
     for (const [keyvalue, runs] of valueRects) {
         if (keyvalue <= start || runs.length === 0) continue
-        const lastRun = (runs.at(-1) ?? {'end': 'default'})
-        lastRun.end = lastRun.end ?? closingPosition
+        const lastRun = (runs.at(-1) ?? {'end': 'default', 'start': 0})
+        lastRun.end = lastRun.end ?? closingPosition === lastRun.start ? lastRun.start + 1 : closingPosition
     }
 }
 
-// Alternative approach: instead of downsampling. Keep the sparse representation by converting into scan-lined-based per-color lines.
+// The data are very sparse, so we can use a set-of-runs representation effectively.
+// Ideally we'd be able to use these directly as vector graphics, but this winds up being very
+// challenging to integrate into the (canvas-based) TimeScrollView, and we can't use a full-resolution
+// Canvas (even offscreen) because it'll be represented as bitmap and blow up the memory usage.
 const linesRep = (values: number[], positions: number[], times: number[]) => {
     const results: TimeColumn[] = []
     let dataIndex = 0
     times.forEach((t) => {
         const rangeValues = new Set(values.slice(dataIndex, dataIndex + t))
-        const maxValue = Math.max(...rangeValues)
-        const minValue = Math.min(...rangeValues)
         const valueRuns = new Map<number, Run[]>([...rangeValues].map(v => [v, []]))
         const indices = argsort(positions.slice(dataIndex, dataIndex + t), dataIndex)
         let lastPosition = -1
@@ -145,10 +197,20 @@ const linesRep = (values: number[], positions: number[], times: number[]) => {
             lastValue = v
         })
         closeRuns(valueRuns, lastPosition)
-        results.push({valueRects: valueRuns, min: minValue, max: maxValue})
+        results.push(valueRuns)
         dataIndex += t
     })
     return results
+}
+
+
+const getVisibleFrames = (_startTimeSec: number, _samplingFrequencyHz: number, dataLength: number, visibleTimeStartSeconds?: number, visibleTimeEndSeconds?: number) => {
+    const _visibleStartTime = Math.max((visibleTimeStartSeconds ?? _startTimeSec), _startTimeSec)
+    const firstFrame = Math.floor((_visibleStartTime - _startTimeSec) * _samplingFrequencyHz)
+    const lastFrame = visibleTimeEndSeconds === undefined
+        ? dataLength - 1
+        : firstFrame + Math.floor((visibleTimeEndSeconds - (visibleTimeStartSeconds ?? 0)) * _samplingFrequencyHz)
+    return { firstFrame, lastFrame }
 }
 
 
@@ -162,122 +224,23 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     const { visibleTimeStartSeconds, visibleTimeEndSeconds } = useTimeRange()
     const [showLinearPositionsOverlay, setShowLinearPositionsOverlay] = useState<boolean>(false)
     
-    // ****** Row-range representation
-    const perFrameLinesRepresentation = useMemo(() => linesRep(values, positions, frameBounds), [values, positions, frameBounds])
-    const visibleLines = useMemo(() => {
-        const firstFrame = ((visibleTimeStartSeconds ?? 0) - _startTimeSec)
-        const lastFrame = 1 + ((visibleTimeEndSeconds === undefined)
-            ? perFrameLinesRepresentation.length
-            : firstFrame + Math.floor((visibleTimeEndSeconds - (visibleTimeStartSeconds ?? 0)) * _samplingFrequencyHz))
-        return perFrameLinesRepresentation.slice(firstFrame, lastFrame)
-    }, [perFrameLinesRepresentation, visibleTimeStartSeconds, visibleTimeEndSeconds, _startTimeSec, _samplingFrequencyHz])
+    const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleTimeStartSeconds, visibleTimeEndSeconds)
+    const visibleFrameRange = lastFrame - firstFrame
 
+    // TODO: Move to top or expose these as configurable
+    const baseScaleFactor = 3
+    const maxVisibleWidth = 20000
 
-    // ****** THE DOWNSAMPLING VERSION
-    // // So we would like to assemble a couple things.
-    // // We need a complete matrix to correspond to the data in range.
-    // // The other thing we need is the linear overlay.
-    // // That comes from the data that came in somehow--need to sort that out at source.
+    const scaleFactor = computeScaleFactor(baseScaleFactor, visibleFrameRange, maxVisibleWidth)
+    const { downsampledStart, downsampledEnd } = getDownsampledRange(scaleFactor, firstFrame, lastFrame)
 
-    // // Step 0: Restrict visible range
-    // // TODO: Replace the sampling freq business with a computation based on len(frameBounds) and
-    // // the startTimeSec, endTimeSec delta
-    // const { startDataIndex, endDataIndex, startTimeIndex, endTimeIndex } = useMemo(() => {
-    //     const startTimeIndex = Math.floor(((visibleTimeStartSeconds ?? 0) - _startTimeSec) * _samplingFrequencyHz)
-    //     const endTimeIndexOffset = Math.floor((endTimeSec - (visibleTimeEndSeconds ?? 0)) * _samplingFrequencyHz)
-    //     const endTimeIndex = frameBounds.length - (endTimeIndexOffset)
-    //     const startDataIndex = sumRange(frameBounds, 0, startTimeIndex)
-    //     // TODO: double-check for off-by-one here
-    //     const endDataIndex = startDataIndex + sumRange(frameBounds, startTimeIndex, endTimeIndex) + 1
-    //     return { startDataIndex, endDataIndex, startTimeIndex, endTimeIndex }
-    // }, [visibleTimeStartSeconds, visibleTimeEndSeconds, frameBounds])
-
-    // // restrict data ranges to ranges we care about
-    // const { visibleFrames, visibleValues, visiblePositions } = useMemo(() => {
-    //     return {
-    //         visibleFrames: frameBounds.slice(startTimeIndex, endTimeIndex),
-    //         visibleValues: values.slice(startDataIndex, endDataIndex),
-    //         visiblePositions: positions.slice(startDataIndex, endDataIndex)
-    //     }
-    // }, [startTimeIndex, endTimeIndex, startDataIndex, endDataIndex, frameBounds, values, positions])
-
-    // // TODO: Better fix on the positions key issue, make sure we don't skip anything!
-
-    // // TODO: downsampling with the all-in-memory data
-    // // because I think we do still need to do it...
-    // // basically, each *pixel* at each 
-    
-    // // TODO: Would it be better to make a grid of the whole thing? It's just a bunch of ints...
-    // // hahahaha no that's going to be huge
-    // // Okay, we *have* to downsample, we can't store the whole blown-out thing at full resolution
-    
-    // // There's probably a closed-form version of this, but we'll probably use more sophisticated
-    // // downsampling anyway.
-    // const samplesPerPixel = useMemo(() => {
-    //     return visibleFrames.length / width
-    // }, [visibleFrames, width])
-    
-    // const { downsampledValues, downsampledPositions, downsampledTimes } = useMemo(() => {
-    //     return downsample(visibleValues, visiblePositions, visibleFrames, samplesPerPixel)
-    // }, [visibleValues, visiblePositions, visibleFrames, samplesPerPixel])
-    
-    // // TODO: This needs to restrict over the visible range
-    // const { maxValue, minValue } = useMemo(() => {
-    //     const maxValue = max(downsampledValues) ?? 255
-    //     const minValue = min(downsampledValues) ?? 0
-    //     return { maxValue, minValue }
-    // }, [downsampledValues])
-    // const numTimepoints = useMemo(() => downsampledTimes.length, [downsampledTimes])
-
-    // const imageData = useMemo(() => {
-    //     // need to type-check anything?
-    //     const colorForValue = getColorForValueFn(minValue, maxValue)
-    //     const invertedPosition = (p: number) => positionsKey.length - p
-    //     const zeroValue = colorForValue(0)
-    //     const totalTimePoints = downsampledTimes.length
-    //     const totalLinearPositionBuckets = positionsKey.length
-    //     const data = Array.from({length: totalTimePoints}, () => new Array(totalLinearPositionBuckets).fill(zeroValue))
-        
-    //     // Remember to invert the y-axis.
-    //     let dataSoFar = 0
-    //     data.forEach((valuesThisTimePoint, timePoint) => {
-    //         const dataPointsThisTimePoint = downsampledTimes[timePoint]
-    //         for (let i = dataSoFar; i < dataPointsThisTimePoint; i++) {
-    //             const position = invertedPosition(downsampledPositions[i])
-    //             valuesThisTimePoint[position] = colorForValue(downsampledValues[i])
-    //         }
-    //         dataSoFar += dataPointsThisTimePoint
-    //     })
-    //     const clampedData = Uint8ClampedArray.from(data.flat())
-    //     const imageData = new ImageData(clampedData, totalTimePoints)
-    //     return imageData
-    // }, [visibleFrames, positionsKey])
-
+    const sampledData = useMemo(() => staticDownsample(values, positions, frameBounds, scaleFactor), [values, positions, frameBounds, scaleFactor])
+    const linesRepresentation = useMemo(() => linesRep(sampledData.downsampledValues, sampledData.downsampledPositions, sampledData.downsampledTimes), [sampledData])
     const linearPositions: number[] = []
-    // ******* Pre-existing linear position and range sample stuff
-    // const rangeStartSample = useMemo(() => {
-    //     return visibleTimeStartSeconds === undefined ? 0 : Math.max(0, Math.floor(visibleTimeStartSeconds - startTimeSec) * samplingFrequency)
-    // }, [visibleTimeStartSeconds, startTimeSec, samplingFrequency])
-    // const rangeEndSample = useMemo(() => {
-    //     return visibleTimeEndSeconds === undefined ? 0 : Math.min(numTimepoints, Math.ceil((visibleTimeEndSeconds - startTimeSec) * samplingFrequency))
-    // }, [visibleTimeEndSeconds, numTimepoints, startTimeSec, samplingFrequency])
+    // TODO: also look at observed-position series from data & run it through staticDownsample
+    // TODO: linesRep equivalent using the downsampled observed-position data
 
-    // const downsampleFactor = useMemo(() => {
-    //     if (visibleTimeStartSeconds === undefined || visibleTimeEndSeconds === undefined) return 1
-    //     const target = (rangeEndSample - rangeStartSample)/width
-    //     const factor = Math.ceil(Math.log(target)/Math.log(multiscaleFactor))
-    //     return Math.pow(multiscaleFactor, factor)
-    // }, [visibleTimeStartSeconds, visibleTimeEndSeconds, rangeEndSample, rangeStartSample, width, multiscaleFactor])
-    
-    // const visibleLinearPositions: number[] | undefined = useMemo(() => {
-    //     if (!linearPositions) return undefined
-    //     if (visibleTimeStartSeconds === undefined) return undefined
-    //     if (visibleTimeEndSeconds === undefined) return undefined
-    //     const i1 = Math.max(0, Math.floor((visibleTimeStartSeconds - _startTimeSec) * _samplingFrequencyHz))
-    //     const i2 = Math.min(numTimepoints, Math.ceil((visibleTimeEndSeconds - _startTimeSec) * _samplingFrequencyHz))
-    //     return linearPositions.slice(i1, i2)
-    // }, [numTimepoints, linearPositions, _samplingFrequencyHz, startTimeSec, visibleTimeStartSeconds, visibleTimeEndSeconds])
-    
+
     const margins = useTimeseriesMargins(timeseriesLayoutOpts)
     const adjustedHeight = linearPositions ? height - 30 : height // leave an additional margin for the checkbox if we have linear positions to display
     const panelCount = 1
@@ -289,92 +252,61 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     }, [])
 
     const renderTime = useMemo(() => {
-    // ****** Row-Range version, draw up a fixed offscreen canvas
-        // TODO: scaling per actual positions map
         if (canvas === undefined) return
-        canvas.width = visibleLines.length
-        canvas.height = positionsKey.length + 1
+        canvas.width = downsampledEnd - downsampledStart
+        const scaler = Math.floor(panelHeight / (positionsKey.length + 1))
+        canvas.height = scaler * (positionsKey.length + 1)
         const c = canvas.getContext('2d')
         if (!c) return
-        // // This blows up the stack :(
-        // const maxVal = Math.max(...(visibleLines.map(l => l.max ?? 0)))
-        // const minVal = Math.min(...(visibleLines.map(l => l.min ?? 255)))
-        let maxVal = 0
-        let minVal = 255
-        visibleLines.forEach(l => {
-            if (l.max !== undefined) {
-                maxVal = maxVal < l.max ? l.max : maxVal
-            }
-            if (l.min !== undefined) {
-                minVal = minVal > l.min ? l.min : minVal
-            }
-        })
+        const maxVal = 255
+        const minVal = 0
 
         const colorFn = getColorForValueFnString(minVal, maxVal)
         const emptyStyle = colorFn(0)
-        // TODO: memoize the styles or sth? Combine lines in a prepass to avoid context switches?
+        // TODO: memoize the styles? Combine lines in a prepass to avoid context switches?
         c.clearRect(0, 0, canvas.width, canvas.height)
         c.fillStyle = emptyStyle
         c.fillRect(0, 0, canvas.width, canvas.height)
-        visibleLines.forEach((l, i) => {
-            if (i < 10) console.log(`Printing run ${i} which is ${JSON.stringify(l)} with ${l.valueRects.size} entries`)
-            for (const [probability, runs] of l.valueRects) {
+        const visibleSlice = linesRepresentation.slice(downsampledStart, downsampledEnd + 1)
+        visibleSlice.forEach((l, i) => {
+            for (const [probability, runs] of l) {
                 c.strokeStyle = colorFn(probability)
                 if (runs === undefined || runs.length === 0) continue
                 c.beginPath()
                 for (const interval of runs) {
-                    if (interval.end === undefined) continue // or warn or something, this shouldn't happen
-                    c.moveTo(i, canvas.height - interval.start)
-                    c.lineTo(i, canvas.height - interval.end)
+                    if (interval.end === undefined) continue // or warn maybe; this shouldn't happen
+                    c.moveTo(i, canvas.height - (scaler * interval.start))
+                    c.lineTo(i, canvas.height - (scaler * interval.end))
                 }
                 c.stroke()
             }
         })
         // TODO: linear position overlay
+        // Follows the exact same logic as used for visibleSlice but with the linearPosition data set
+        // and with a visually distinct styling.
 
         return Date.now()
-    }, [canvas, visibleLines, positionsKey.length])
+    }, [canvas, linesRepresentation, positionsKey.length, downsampledStart, downsampledEnd, panelHeight])
 
-    // ****** Row-range paint-panel: only rescales the fixed offscreen canvas and displays that.
-
-    // TODO: Fix a) not rendering on first load
-    // TODO: Fix b) debounce on panel size changes, don't sweat drawing the intermediary frames
     const paintPanel = useCallback((context: CanvasRenderingContext2D, props: PanelProps) => {
         const canvas = props.offscreenCanvas
         if (canvas === undefined) return
+        if (canvas.width === 0 || canvas.height === 0) {
+            console.log(`Offscreen canvas dims ${canvas.width} x ${canvas.height}`)
+            return
+        }
+        if (context.canvas.width === 0 || context.canvas.height === 0) {
+            console.log(`Onscreen canvas dims ${context.canvas.width} x ${context.canvas.height}`)
+            return
+        }
         context.clearRect(0, 0, context.canvas.width, context.canvas.height)
         context.drawImage(canvas, 0, 0, panelWidth, panelHeight)
+        // Could potentially use the below source-and-target-rect version of the call to reduce antialiasing, but
+        // in practice it didn't seem to make much difference. (Also need to computate an integer scaling
+        // factor & center the display--this was implemented but removed.)
         // context.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, panelWidth, panelHeight)
-    }, [renderTime, panelWidth, panelHeight])
-
-    // ****** LEGACY PAINT PANEL -- WILL WANT TO COPY FOR THE IMAGE VERSION
-    // const paintPanel = useCallback((context: CanvasRenderingContext2D, props: PanelProps) => {
-    //     const canvas = props.offscreenCanvas
-    //     if (canvas === undefined) return
-    //     if (!imageData) return
-    //     canvas.width = imageData.width
-    //     canvas.height = imageData.height
-    //     const c = canvas.getContext('2d')
-    //     if (!c) return
-        
-    //     c.clearRect(0, 0, canvas.width, canvas.height)
-    //     c.putImageData(imageData, 0, 0)
-    //     if ((showLinearPositionsOverlay) && (visibleLinearPositions)) {
-    //         c.fillStyle = 'white'
-    //         c.strokeStyle = 'white'
-    //         for (let i = 0; i < visibleLinearPositions.length; i++) {
-    //             const xx = i / downsampleFactor
-    //             const yy = imageData.height - 1 - visibleLinearPositions[i]
-    //             c.fillRect(xx - 0.5, yy + 0.5, 1, 1)
-    //         }
-    //     }
-    //     // Draw scaled version of image
-    //     // See: https://stackoverflow.com/questions/3448347/how-to-scale-an-imagedata-in-html-canvas
-
-    //     // Scaling the offscreen canvas can be done when it's drawn in, which avoids having to deal with transforms and some margin issues.
-    //     context.clearRect(0, 0, context.canvas.width, context.canvas.height)
-    //     context.drawImage(canvas, 0, 0, panelWidth, panelHeight)
-    // }, [imageData, showLinearPositionsOverlay, visibleLinearPositions, downsampleFactor, panelWidth, panelHeight])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [renderTime, panelWidth, panelHeight]) // renderTime dependency forces an update when the offscreen canvas redraws
 
     const panels: TimeScrollViewPanel<PanelProps>[] = useMemo(() => {
         return [{
@@ -408,55 +340,28 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     )
 }
 
-export const allocate2d = (N1: number, N2: number, value: number | undefined) => {
-    const ret: (number | undefined)[][] = []
-    for (let i1 = 0; i1 < N1; i1++) {
-        ret.push(allocate1d(N2, value))
-    }
-    return ret
-}
-
-export const allocate1d = (N: number, value: number | undefined) => {
-    const ret: (number | undefined)[] = []
-    for (let i = 0; i < N; i++) ret.push(value)
-    return ret
-}
-
-/**
- * Given a range of values, generates a function that maps a (possibly undefined)
- * value in that range into an RGBA color value whose R and G intensities are
- * in (0, 255) and proportional to the value's position within the range.
- * The generated function returns black transparent pixels for undefined values.
- * @param min Lowest value in the data range.
- * @param max Highest value in the data range.
- * @returns Convenience function to convert values to proportionally colored pixels.
- */
-const getColorForValueFn = (min: number, max: number) => {
-    const theScale = 255 / (max - min)
-    return (v: number | undefined) => {
-        if (v === undefined) return [0, 0, 0, 0]
-        const proportion = (v - min) * theScale
-        const intensity = Math.max(0, Math.min(255, 3 * Math.floor(proportion)))
-        return [intensity, intensity, 60, 255]
-    }
-}
-
 const getColorForValueFnString = (min: number, max: number) => {
     const theScale = 255 / (max - min)
     return (v: number | undefined) => {
         if (v === undefined) return "rgba(0, 0, 0, 0)"
-        const proportion = (v - min) * theScale
-        const intensity = Math.max(0, Math.min(255, 3 * Math.floor(proportion)))
-        return `rgba(${intensity}, ${intensity}, 60, 255)`
+        if (v === 0) return "#BBBAB8" // We don't actually use 0 values in the data, this is just for the background.
+        // Instead, map it to a dove-grey color that will hopefully provide decent contrast with the real color scales.
+        const v_effective = Math.min(1, v/128)
+        switch (COLOR_MAP_CHOICE as ValidColorMap | undefined) {
+            case 'inferno':
+                return inferno(v_effective)
+            case 'magma':
+                return magma(v_effective)
+            case 'plasma':
+                return plasma(v_effective)
+            case 'viridis':
+                return viridis(v_effective)
+            default:
+                const proportion = (v - min) * theScale
+                const intensity = Math.max(0, Math.min(255, 3 * Math.floor(proportion)))
+                return `rgba(${intensity}, ${intensity}, 60, 255)`
+        }
     }
-}
-
-const min = (a: (number | undefined)[]) => {
-    return a.filter(x => (x !== undefined)).reduce((prev, current) => ((prev as number) < (current as number)) ? prev : current, a[0] || 0)
-}
-
-const max = (a: (number | undefined)[]) => {
-    return a.filter(x => (x !== undefined)).reduce((prev, current) => ((prev as number) > (current as number)) ? prev : current, a[0] || 0)
 }
 
 export default DecodedLinearPositionPlotView
