@@ -6,6 +6,7 @@ export type DecodedLinearPositionPlotData = {
     positions: number[]
     frameBounds: number[]
     positionsKey: number[]
+    observedPositions?: number[]
     startTimeSec?: number
     samplingFrequencyHz?: number // TODO: Can we get rid of this?
 }
@@ -17,6 +18,7 @@ export const isDecodedLinearPositionPlotData = (x: any) : x is DecodedLinearPosi
         positions: isArrayOf(isNumber),
         frameBounds: isArrayOf(isNumber),
         positionsKey: isArrayOf(isNumber),
+        observedPositions: optional(isArrayOf(isNumber)),
         startTimeSec: optional(isNumber),
         samplingFrequencyHz: optional(isNumber)
         // start time seconds?
