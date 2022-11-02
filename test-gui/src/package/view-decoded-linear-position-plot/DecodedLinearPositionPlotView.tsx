@@ -4,14 +4,13 @@ import { FunctionComponent, useCallback, useMemo, useState } from 'react'
 import { ValidColorMap } from '../view-track-position-animation/TPADecodedPositionLayer'
 import { computeScaleFactor, downsampleObservedPositions, getDownsampledRange, getVisibleFrames, staticDownsample } from './DecodedLinearPositionDownsampling'
 import { getColorStyles, OffscreenRenderProps, useOffscreenCanvasRange, useOffscreenPainter, usePositions } from './DecodedLinearPositionDrawing'
-import { convertToOverlappingRectangles } from './DecodedLinearPositionLineRepresentations'
 import { DecodedLinearPositionPlotData } from './DecodedLinearPositionPlotViewData'
 // import { TimeseriesLayoutOpts } from '@figurl/timeseries-views'
 
 // TODO: Make these configurable
 const BASE_SCALE_FACTOR = 3
-const MAX_WIDTH_FOR_SCALING = 20000
-const MAX_OFFSCREEN_CANVAS_WIDTH = 20000
+const MAX_WIDTH_FOR_SCALING = 2000
+const MAX_OFFSCREEN_CANVAS_WIDTH = 2000
 const MAX_OFFSCREEN_CANVAS_HEIGHT = 1000
 const DEFAULT_SAMPLES_PER_SECOND = 1000
 
@@ -72,7 +71,9 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     // console.log(`\t\t...Finished downsampling data: ${Date.now() - now}`)
     // now = Date.now()
     // console.log(`\tGetting rectangles representation for downsampled data: ${now}`)
-    const linesRepresentation = useMemo(() => convertToOverlappingRectangles(sampledData.downsampledValues, sampledData.downsampledPositions, sampledData.downsampledTimes), [sampledData])
+
+    // const linesRepresentation = useMemo(() => convertToOverlappingRectangles(sampledData.downsampledValues, sampledData.downsampledPositions, sampledData.downsampledTimes), [sampledData])
+
     // console.log(`\t\t...Finished representing data: ${Date.now() - now}`)
     // now = Date.now()
     // console.log(`\tDownsampling observed position: ${now}`)
@@ -106,7 +107,7 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     }, [])
 
     const { canvasPositions, targetHeight } = usePositions(MAX_OFFSCREEN_CANVAS_HEIGHT, positionsKey)
-    const canvasTargetWidth = useMemo(() => Math.min(MAX_OFFSCREEN_CANVAS_WIDTH, linesRepresentation.length), [linesRepresentation])
+    const canvasTargetWidth = useMemo(() => Math.min(MAX_OFFSCREEN_CANVAS_WIDTH, sampledData.downsampledTimes.length), [sampledData.downsampledTimes.length])
     const painter = useOffscreenPainter(colorStyles, targetHeight, canvasPositions)
     const offscreenRenderProps = useMemo(() => {
         const props: OffscreenRenderProps = {
@@ -115,12 +116,12 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
             canvasTargetHeight: targetHeight,
             painter,
             scale: scaleFactor,
-            linesRepresentation,
+            sampledData,
             downsampledRangeStart: downsampledStart,
             downsampledRangeEnd: downsampledEnd
         }
         return props
-    }, [canvas, targetHeight, scaleFactor, linesRepresentation, downsampledStart, downsampledEnd, canvasTargetWidth, painter])
+    }, [canvas, targetHeight, scaleFactor, sampledData, downsampledStart, downsampledEnd, canvasTargetWidth, painter])
     // now = Date.now()
     // console.log(`\tRendering to offscreen canvas: ${now}`)
     const displayRange = useOffscreenCanvasRange(offscreenRenderProps)

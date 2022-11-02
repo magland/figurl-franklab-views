@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { inferno, magma, plasma, viridis } from 'scale-color-perceptual'
 import { ValidColorMap } from '../view-track-position-animation/TPADecodedPositionLayer'
-import { TimeColumn } from './DecodedLinearPositionLineRepresentations'
+import { DownsampledData } from './DecodedLinearPositionDownsampling'
 
 // const DARK_DOVE_GREY = 'rgb(119, 118, 114)'
 
@@ -22,7 +22,7 @@ export type OffscreenRenderProps = {
     canvasTargetWidth: number
     canvasTargetHeight: number
     painter: OffscreenPainter
-    linesRepresentation: TimeColumn[]
+    sampledData: DownsampledData
     scale: number
     downsampledRangeStart: number
     downsampledRangeEnd: number
@@ -33,7 +33,7 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
     const contentsStart = useRef<number>(0)
     const contentsEnd = useRef<number>(0)
     const currentScale = useRef<number>(0)
-    const { canvas, canvasTargetWidth, canvasTargetHeight, painter, scale, linesRepresentation, downsampledRangeStart, downsampledRangeEnd } = props
+    const { canvas, canvasTargetWidth, canvasTargetHeight, painter, scale, sampledData, downsampledRangeStart, downsampledRangeEnd } = props
 
     if (canvas === undefined) return [0, 0]
 
@@ -67,12 +67,12 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
 
     // Request cannot be served from cache.
     const visibleRangeMidpoint = Math.floor((downsampledRangeEnd - downsampledRangeStart)/2) + downsampledRangeStart
-    const {targetStart, targetEnd} = getRenderTargetRange(visibleRangeMidpoint, linesRepresentation.length - 1, canvas.width)
+    const {targetStart, targetEnd} = getRenderTargetRange(visibleRangeMidpoint, sampledData.downsampledTimes.length - 1, canvas.width)
 
     // TODO: Can this be passed off to a separate worker thread?
     // TODO: Further refactoring could separate this entirely, since the rest of this function does not care about a)
     // whether the canvas actually exists and b) the painter, canvas, or lines-representation. Mostly.
-    updateCachedImage(targetStart, targetEnd, contentsStart.current, contentsEnd.current, painter, linesRepresentation, canvas)
+    updateCachedImage(targetStart, targetEnd, contentsStart.current, contentsEnd.current, painter, sampledData, canvas)
 
     contentsStart.current = targetStart
     contentsEnd.current = targetEnd
@@ -81,7 +81,7 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
 }
 
 
-const updateCachedImage = (targetStart: number, targetEnd: number, currentStart: number, currentEnd: number, painter: OffscreenPainter, linesRepresentation: TimeColumn[], canvas: HTMLCanvasElement) => {
+const updateCachedImage = (targetStart: number, targetEnd: number, currentStart: number, currentEnd: number, painter: OffscreenPainter, sampledData: DownsampledData, canvas: HTMLCanvasElement) => {
     const c = canvas.getContext('2d')
     if (!c) {
         console.warn(`Problem getting drawing context for offscreen canvas.`)
@@ -90,7 +90,7 @@ const updateCachedImage = (targetStart: number, targetEnd: number, currentStart:
 
     if (targetStart >= currentEnd || targetEnd <= currentStart) {
         // console.log(`replacing full cache`)
-        painter(targetStart, targetEnd - targetStart, 0, linesRepresentation, c)
+        painter(targetStart, targetEnd - targetStart, 0, sampledData, c)
     } else {
         const uncopyableLeftWidth = Math.max(0, currentStart - targetStart)
         const copyRange = [Math.max(targetStart, currentStart), Math.min(targetEnd, currentEnd)]
@@ -108,47 +108,65 @@ const updateCachedImage = (targetStart: number, targetEnd: number, currentStart:
             c.drawImage(canvas, copyStart, 0, copyWidth, canvas.height, copyTarget, 0, copyWidth, canvas.height)
         }
         if (uncopyableLeftWidth > 0) {
-            painter(targetStart, uncopyableLeftWidth, 0, linesRepresentation, c)
+            painter(targetStart, uncopyableLeftWidth, 0, sampledData, c)
         }
         if (uncopyableRightWidth > 0) {
-            painter(targetEnd - uncopyableRightWidth, uncopyableRightWidth, canvas.width - uncopyableRightWidth - 1, linesRepresentation, c)
+            painter(targetEnd - uncopyableRightWidth, uncopyableRightWidth, canvas.width - uncopyableRightWidth - 1, sampledData, c)
         }
     }
 }
 
-type OffscreenPainter = (startInclusive: number, width: number, pixelXOffset: number, data: TimeColumn[], c: CanvasRenderingContext2D) => void
+type OffscreenPainter = (startInclusive: number, width: number, pixelXOffset: number, sampleData: DownsampledData, c: CanvasRenderingContext2D) => void
 export const useOffscreenPainter = (styles: string[], height: number, myPositions: number[]) => {
-    const drawSlice = useCallback((column: TimeColumn, xPosition: number, c: CanvasRenderingContext2D) => {
-        for (const [probability, runs] of column) {
-            if (runs === undefined || runs.length === 0) continue
-            c.strokeStyle = styles[probability]
-            c.beginPath()
-            for (const interval of runs) {
-                if (interval.end === undefined) continue // this shouldn't happen
-                const startPixel = myPositions[interval.start]
-                const endPixel = myPositions[interval.end]
-                c.moveTo(xPosition, height - startPixel)
-                c.lineTo(xPosition, height - endPixel)
-            }
-            c.stroke()
-        }
-    }, [styles, height, myPositions])
+    // const drawSlice = useCallback((column: TimeColumn, xPosition: number, c: CanvasRenderingContext2D) => {
+    //     for (const [probability, runs] of column) {
+    //         if (runs === undefined || runs.length === 0) continue
+    //         c.strokeStyle = styles[probability]
+    //         c.beginPath()
+    //         for (const interval of runs) {
+    //             if (interval.end === undefined) continue // this shouldn't happen
+    //             const startPixel = myPositions[interval.start]
+    //             const endPixel = myPositions[interval.end]
+    //             c.moveTo(xPosition, height - startPixel)
+    //             c.lineTo(xPosition, height - endPixel)
+    //         }
+    //         c.stroke()
+    //     }
+    // }, [styles, height, myPositions])
 
     const clearRect = useCallback((width: number, pixelOffset: number, c: CanvasRenderingContext2D) => {
         c.fillStyle = styles[0]
         c.fillRect(pixelOffset, 0, width, height)
     }, [styles, height])
 
-    const offscreenPainter = useCallback((startInclusive: number, width: number, pixelXOffset: number, data: TimeColumn[], c: CanvasRenderingContext2D) => {
-        if (startInclusive + width >= data.length) {
-            console.warn(`offscreenPainter called with end (${startInclusive + width} ${startInclusive} ${width}) outside the data range (${data.length}).`)
+    const offscreenPainter = useCallback((startInclusive: number, width: number, pixelXOffset: number, sampledData: DownsampledData, c: CanvasRenderingContext2D) => {
+        if (startInclusive + width >= sampledData.downsampledTimes.length) {
+            console.warn(`offscreenPainter called with end (${startInclusive + width} ${startInclusive} ${width}) outside the data range (${sampledData.downsampledTimes.length}).`)
             return
         }
         clearRect(width, pixelXOffset, c)
-        for (let i = startInclusive; i <= width + startInclusive; i++) {
-            drawSlice(data[i], i - startInclusive + pixelXOffset, c)
+        let kk = 0
+        for (let jj = 0; jj < sampledData.downsampledTimes.length; jj++) {
+            if ((startInclusive <= jj) && (jj <= width + startInclusive)) {
+                const xPosition = jj - startInclusive + pixelXOffset
+                for (let aa = 0; aa < sampledData.downsampledTimes[jj]; aa++) {
+                    const position = sampledData.downsampledPositions[kk]
+                    const value = sampledData.downsampledValues[kk]
+                    c.strokeStyle = styles[value]
+                    c.beginPath()
+                    const startPixel = myPositions[position]
+                    const endPixel = myPositions[position + 1]
+                    c.moveTo(xPosition, height - startPixel)
+                    c.lineTo(xPosition, height - endPixel)
+                    c.stroke()
+                    kk ++
+                }
+            }
+            else {
+                kk += sampledData.downsampledTimes[jj]
+            }
         }
-    }, [clearRect, drawSlice])
+    }, [clearRect, height, myPositions, styles])
 
     return offscreenPainter
 }

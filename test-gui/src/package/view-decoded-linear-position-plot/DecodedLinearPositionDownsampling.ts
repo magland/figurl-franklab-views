@@ -69,12 +69,14 @@ export const staticDownsample = (values: number[], positions: number[], times: n
         const pointCountThisSample = sumRange(times, i, i + scaleFactor)
         for (let j = firstUnfinishedDataPoint; j < firstUnfinishedDataPoint + pointCountThisSample; j++) {
             const p = positions[j]
-            sampleData.set(p, (sampleData.get(p) ?? 0) + values[j])
+            // sampleData.set(p, (sampleData.get(p) ?? 0) + values[j])
+            sampleData.set(p, Math.max(sampleData.get(p) ?? 0, values[j]))
         }
         results.downsampledTimes.push(sampleData.size)
         sampleData.forEach((value, key) => {
             results.downsampledPositions.push(key)
-            results.downsampledValues.push(Math.ceil(value / scaleFactor))
+            // results.downsampledValues.push(Math.ceil(value / scaleFactor))
+            results.downsampledValues.push(Math.ceil(value))
         })
         firstUnfinishedDataPoint += pointCountThisSample
     }
