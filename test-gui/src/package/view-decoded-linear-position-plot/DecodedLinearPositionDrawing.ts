@@ -118,21 +118,20 @@ const updateCachedImage = (targetStart: number, targetEnd: number, currentStart:
 
 type OffscreenPainter = (startInclusive: number, width: number, pixelXOffset: number, sampleData: DownsampledData, c: CanvasRenderingContext2D) => void
 export const useOffscreenPainter = (styles: string[], height: number, myPositions: number[]) => {
-    // const drawSlice = useCallback((column: TimeColumn, xPosition: number, c: CanvasRenderingContext2D) => {
-    //     for (const [probability, runs] of column) {
-    //         if (runs === undefined || runs.length === 0) continue
-    //         c.strokeStyle = styles[probability]
-    //         c.beginPath()
-    //         for (const interval of runs) {
-    //             if (interval.end === undefined) continue // this shouldn't happen
-    //             const startPixel = myPositions[interval.start]
-    //             const endPixel = myPositions[interval.end]
-    //             c.moveTo(xPosition, height - startPixel)
-    //             c.lineTo(xPosition, height - endPixel)
-    //         }
-    //         c.stroke()
-    //     }
-    // }, [styles, height, myPositions])
+    const drawTimeIndex = useCallback((data: DownsampledData, firstDataIndex: number, timeIndex: number, xPosition: number, c: CanvasRenderingContext2D) => {
+        const lastIndex = firstDataIndex + data.downsampledTimes[timeIndex]
+        for (let dataIndex = firstDataIndex; dataIndex < lastIndex; dataIndex++) {
+            const position = data.downsampledPositions[dataIndex]
+            const value = data.downsampledValues[dataIndex]
+            c.strokeStyle = styles[value]
+            c.beginPath()
+            const startPixel = myPositions[position]
+            const endPixel = myPositions[position + 1]
+            c.moveTo(xPosition, height - startPixel)
+            c.lineTo(xPosition, height - endPixel)
+            c.stroke()
+        }
+    }, [styles, height, myPositions])
 
     const clearRect = useCallback((width: number, pixelOffset: number, c: CanvasRenderingContext2D) => {
         c.fillStyle = styles[0]
@@ -145,28 +144,17 @@ export const useOffscreenPainter = (styles: string[], height: number, myPosition
             return
         }
         clearRect(width, pixelXOffset, c)
-        let kk = 0
-        for (let jj = 0; jj < sampledData.downsampledTimes.length; jj++) {
-            if ((startInclusive <= jj) && (jj <= width + startInclusive)) {
-                const xPosition = jj - startInclusive + pixelXOffset
-                for (let aa = 0; aa < sampledData.downsampledTimes[jj]; aa++) {
-                    const position = sampledData.downsampledPositions[kk]
-                    const value = sampledData.downsampledValues[kk]
-                    c.strokeStyle = styles[value]
-                    c.beginPath()
-                    const startPixel = myPositions[position]
-                    const endPixel = myPositions[position + 1]
-                    c.moveTo(xPosition, height - startPixel)
-                    c.lineTo(xPosition, height - endPixel)
-                    c.stroke()
-                    kk ++
-                }
-            }
-            else {
-                kk += sampledData.downsampledTimes[jj]
-            }
+        let dataIndex = 0
+        for (let timeIndex = 0; timeIndex < startInclusive; timeIndex++) {
+            dataIndex += sampledData.downsampledTimes[timeIndex]
         }
-    }, [clearRect, height, myPositions, styles])
+
+        for (let timeIndex = startInclusive; timeIndex < startInclusive + width; timeIndex++) {
+            const xPosition = timeIndex - startInclusive + pixelXOffset
+            drawTimeIndex(sampledData, dataIndex, timeIndex, xPosition, c)
+            dataIndex += sampledData.downsampledTimes[timeIndex]
+        }
+    }, [clearRect, drawTimeIndex])
 
     return offscreenPainter
 }

@@ -58,7 +58,8 @@ export const computeScaleFactor = (baseScaleFactor: number, visibleRangeCount: n
 }
 
 
-export const staticDownsample = (values: number[], positions: number[], times: number[], scaleFactor: number): DownsampledData => {
+// TODO: query users about mean vs max for downsampling method
+export const staticDownsample = (values: number[], positions: number[], times: number[], scaleFactor: number, mode: 'mean' | 'max' = 'mean'): DownsampledData => {
     const results: DownsampledData = { downsampledValues: [], downsampledPositions: [], downsampledTimes: [], scaleFactor }
     if (scaleFactor === 1) {
         return {downsampledValues: values, downsampledPositions: positions, downsampledTimes: times, scaleFactor: 1}
@@ -69,14 +70,20 @@ export const staticDownsample = (values: number[], positions: number[], times: n
         const pointCountThisSample = sumRange(times, i, i + scaleFactor)
         for (let j = firstUnfinishedDataPoint; j < firstUnfinishedDataPoint + pointCountThisSample; j++) {
             const p = positions[j]
-            // sampleData.set(p, (sampleData.get(p) ?? 0) + values[j])
-            sampleData.set(p, Math.max(sampleData.get(p) ?? 0, values[j]))
+            if (mode === 'mean') {
+                sampleData.set(p, (sampleData.get(p) ?? 0) + values[j])
+            } else if (mode === 'max') {
+                sampleData.set(p, Math.max(sampleData.get(p) ?? 0, values[j]))
+            }
         }
         results.downsampledTimes.push(sampleData.size)
         sampleData.forEach((value, key) => {
             results.downsampledPositions.push(key)
-            // results.downsampledValues.push(Math.ceil(value / scaleFactor))
-            results.downsampledValues.push(Math.ceil(value))
+            if (mode === 'mean') {
+                results.downsampledValues.push(Math.ceil(value / scaleFactor))
+            } else if (mode === 'max') {
+                results.downsampledValues.push(Math.ceil(value))
+            }
         })
         firstUnfinishedDataPoint += pointCountThisSample
     }

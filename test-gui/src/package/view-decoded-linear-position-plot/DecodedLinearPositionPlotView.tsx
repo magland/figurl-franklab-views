@@ -58,8 +58,8 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     const visibleFrameRange = lastFrame - firstFrame
     
     const scaleFactor = computeScaleFactor(BASE_SCALE_FACTOR, visibleFrameRange, MAX_WIDTH_FOR_SCALING)
-    // console.log(`Scale factor: ${scaleFactor}`)
-    // let now = Date.now()
+    console.log(`Scale factor: ${scaleFactor}`)
+    let now = Date.now()
     const { downsampledStart, downsampledEnd } = getDownsampledRange(scaleFactor, firstFrame, lastFrame)
 
     // Possibility: would it be reasonable to cache every downsampling level we touch? Could become memory-prohibitive...
@@ -122,10 +122,10 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         }
         return props
     }, [canvas, targetHeight, scaleFactor, sampledData, downsampledStart, downsampledEnd, canvasTargetWidth, painter])
-    // now = Date.now()
-    // console.log(`\tRendering to offscreen canvas: ${now}`)
+    now = Date.now()
+    console.log(`\tRendering to offscreen canvas: ${now}`)
     const displayRange = useOffscreenCanvasRange(offscreenRenderProps)
-    // console.log(`\t\t...done rendering to offscreen canvas: ${Date.now() - now}`)
+    console.log(`\t\t...done rendering to offscreen canvas: ${Date.now() - now}`)
 
     const paintPanel = useCallback((context: CanvasRenderingContext2D, props: PanelProps) => {
         if (canvas === undefined) return
