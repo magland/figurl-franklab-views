@@ -69,9 +69,7 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
     const visibleRangeMidpoint = Math.floor((downsampledRangeEnd - downsampledRangeStart)/2) + downsampledRangeStart
     const {targetStart, targetEnd} = getRenderTargetRange(visibleRangeMidpoint, sampledData.downsampledTimes.length - 1, canvas.width)
 
-    // TODO: Can this be passed off to a separate worker thread?
-    // TODO: Further refactoring could separate this entirely, since the rest of this function does not care about a)
-    // whether the canvas actually exists and b) the painter, canvas, or lines-representation. Mostly.
+    // note: theoretically this could be separate and handled asynchronously by a worker thread
     updateCachedImage(targetStart, targetEnd, contentsStart.current, contentsEnd.current, painter, sampledData, canvas)
 
     contentsStart.current = targetStart
@@ -89,7 +87,6 @@ const updateCachedImage = (targetStart: number, targetEnd: number, currentStart:
     }
 
     if (targetStart >= currentEnd || targetEnd <= currentStart) {
-        // console.log(`replacing full cache`)
         painter(targetStart, targetEnd - targetStart, 0, sampledData, c)
     } else {
         const uncopyableLeftWidth = Math.max(0, currentStart - targetStart)
@@ -99,12 +96,10 @@ const updateCachedImage = (targetStart: number, targetEnd: number, currentStart:
         }
         const copyWidth = 1 + copyRange[1] - copyRange[0]
         const uncopyableRightWidth = Math.max(0, targetEnd - currentEnd)
-        // console.log(`Partial replacement. Left: ${uncopyableLeftWidth} copy: (${copyRange[0]} - ${copyRange[1]}) = ${copyWidth} balance: ${uncopyableRightWidth}\nTotal: ${uncopyableLeftWidth + uncopyableRightWidth + copyWidth}`)
         // The copy has to happen first, or we'll start overwriting the data we want to keep.
         if (copyRange[0] < copyRange[1]) {
             const copyStart = copyRange[0] - currentStart
             const copyTarget = uncopyableLeftWidth
-            // console.log(`Copying ${copyStart} (${copyRange[0]} - ${contentsStart.current}) into ${copyTarget}`)
             c.drawImage(canvas, copyStart, 0, copyWidth, canvas.height, copyTarget, 0, copyWidth, canvas.height)
         }
         if (uncopyableLeftWidth > 0) {

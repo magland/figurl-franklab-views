@@ -111,10 +111,6 @@ export const downsampleObservedPositions = (scaleFactor: number, positions: numb
         return positions
     }
     const p: number[] = Array.from({length: Math.ceil(positions.length / scaleFactor)})
-    // This doesn't seem to result in any performance improvement, unfortunately.
-    // for (let index = 0; index < p.length; index++) {
-    //     p[index] = median(positions.slice(index * scaleFactor, (index + 1) * scaleFactor))
-    // }
     p.forEach((value, index) => {
         p[index] = median(positions.slice(index * scaleFactor, (index + 1) * scaleFactor))
     })
