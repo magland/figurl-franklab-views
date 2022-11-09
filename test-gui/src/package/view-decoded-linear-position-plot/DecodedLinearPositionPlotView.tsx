@@ -2,7 +2,7 @@ import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimen
 import { Checkbox } from '@material-ui/core'
 import { FunctionComponent, useCallback, useMemo, useState } from 'react'
 import { ValidColorMap } from '../view-track-position-animation/TPADecodedPositionLayer'
-import { computeScaleFactor, downsampleObservedPositions, getDownsampledRange, getVisibleFrames, staticDownsample } from './DecodedLinearPositionDownsampling'
+import { computeScaleFactor, getDownsampledRange, getVisibleFrames, staticDownsample } from './DecodedLinearPositionDownsampling'
 import { getColorStyles, OffscreenRenderProps, useOffscreenCanvasRange, useOffscreenPainter, usePositions } from './DecodedLinearPositionDrawing'
 import { DecodedLinearPositionPlotData } from './DecodedLinearPositionPlotViewData'
 // import { TimeseriesLayoutOpts } from '@figurl/timeseries-views'
@@ -62,9 +62,8 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
 
     // Possibility: would it be reasonable to cache every downsampling level we touch? Could become memory-prohibitive...
     const sampledData = useMemo(() => staticDownsample(values, positions, frameBounds, scaleFactor), [values, positions, frameBounds, scaleFactor])
-    const downsampledObserved = useMemo(() => observedPositions ? downsampleObservedPositions(scaleFactor, observedPositions) : undefined, [observedPositions, scaleFactor])
     const lastPosition = useMemo(() => (positionsKey.at(-1) ?? 0) + positionsKey[0], [positionsKey])
-    const scaledObserved = useMemo(() => downsampledObserved === undefined ? undefined : downsampledObserved.map(p => 1 - (p/lastPosition)), [lastPosition, downsampledObserved])
+    const scaledObserved = useMemo(() => observedPositions === undefined ? undefined : observedPositions.map(p => 1 - (p/lastPosition)), [lastPosition, observedPositions])
 
     const margins = useTimeseriesMargins(timeseriesLayoutOpts)
     const adjustedHeight = observedPositions ? height - 30 : height // leave an additional margin for the checkbox if we have linear positions to display
@@ -102,19 +101,28 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         context.imageSmoothingEnabled = false
         context.drawImage(canvas, displayRange[0], 0, displayRange[1] - displayRange[0], canvas.height, 0, 0, panelWidth, panelHeight)
         if (showObservedPositionsOverlay && scaledObservedPositions !== undefined) {
-            const visibleObserved = scaledObservedPositions.slice(downsampledStart, downsampledEnd + 1)
+            const verticalEpsilon = 0.005
+            const alignedStart = downsampledStart * scaleFactor
+            const alignedEnd = downsampledEnd * scaleFactor
+            const visibleObserved = scaledObservedPositions.slice(alignedStart, alignedEnd + 1)
             const xStepSize = visibleObserved.length > 0 ? panelWidth / (visibleObserved.length) : 1
-            let lastP = visibleObserved[0]
             context.strokeStyle = (observedPositionsStyle ?? '#000000')
             context.lineWidth = 2
+            let lastV = visibleObserved[0]  // TODO: would it be better to set the threshold as something like 2-3 pixels?
+            let lastX = -5   // avoids performance loss from drawing sub-pixel points on top of each other. Negative value to handle first point right
             context.beginPath()
             visibleObserved.forEach((v, i) => {
-                Math.abs(v - lastP) > .005 ? context.moveTo(i * xStepSize, panelHeight * v) : context.lineTo(i * xStepSize, panelHeight * v)
-                lastP = v
+                const x = i * xStepSize
+                const deltaV = Math.abs(v - lastV)
+                if ((Math.floor(lastX) !== Math.floor(x)) || (deltaV > verticalEpsilon)) {
+                    deltaV > (verticalEpsilon) ? context.moveTo(x, panelHeight * v) : context.lineTo(x, panelHeight * v)
+                }
+                lastX = x
+                lastV = v
             })
             context.stroke()
         }
-    }, [canvas, panelWidth, panelHeight])
+    }, [canvas, panelWidth, panelHeight, scaleFactor])
 
 
     const panels: TimeScrollViewPanel<PanelProps>[] = useMemo(() => {
