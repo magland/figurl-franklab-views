@@ -1,4 +1,3 @@
-import { median } from 'mathjs'
 
 // We will potentially be doing this a lot, and supposedly the good old for-loop is more
 // performant than doing array-copy slicing and/or fancy reduce tricks.
@@ -97,24 +96,6 @@ export const getDownsampledRange = (scaleFactor: number, firstSelected: number, 
         downsampledStart: Math.floor(firstSelected / scaleFactor),
         downsampledEnd: Math.ceil(lastSelected / scaleFactor)
     }
-}
-
-
-// TODO: Make sure we're using typed arrays for positions array.
-export const downsampleObservedPositions = (scaleFactor: number, positions: number[]): number[] | undefined => {
-    if (positions === undefined) return undefined
-    if (scaleFactor < 1) {
-        console.warn(`Attempt to use scale factor of less than 1 in downsampling observed position. Don't do that.`)
-        return undefined
-    }
-    if (scaleFactor === 1) {
-        return positions
-    }
-    const p: number[] = Array.from({length: Math.ceil(positions.length / scaleFactor)})
-    p.forEach((value, index) => {
-        p[index] = median(positions.slice(index * scaleFactor, (index + 1) * scaleFactor))
-    })
-    return p
 }
 
 
