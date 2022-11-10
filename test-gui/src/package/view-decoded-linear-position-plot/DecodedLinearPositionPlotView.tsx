@@ -51,7 +51,7 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     const endTimeSec = _startTimeSec + frameBounds.length / _samplingFrequencyHz
     useRecordingSelectionTimeInitialization(_startTimeSec, endTimeSec)
     const { visibleTimeStartSeconds, visibleTimeEndSeconds } = useTimeRange()
-    const [showObservedPositionsOverlay, setShowObservedPositionsOverlay] = useState<boolean>(false)
+    const [showObservedPositionsOverlay, setShowObservedPositionsOverlay] = useState<boolean>(true)
     const { colorStyles, contrastStyle } = useMemo(() => getColorStyles(DEFAULT_COLOR_MAP_CHOICE), [])
 
     const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleTimeStartSeconds, visibleTimeEndSeconds)
