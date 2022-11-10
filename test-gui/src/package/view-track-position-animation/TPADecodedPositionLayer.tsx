@@ -1,6 +1,7 @@
 import { BaseCanvas, DrawFn } from '@figurl/core-views'
 import { FunctionComponent, useCallback } from 'react'
 import { inferno, magma, plasma, viridis } from 'scale-color-perceptual'
+import { ValidColorMap } from '../util-color-scales/ColorScales'
 import { DecodedPositionFramePx } from './TrackPositionAnimationTypes'
 
 // EXAMPLE:
@@ -31,8 +32,6 @@ export const defaultPeakPositionStyling: PeakPositionStyling = {
     dotRgb: 'rgb(79, 227, 0)',
     drawPeakDot: true
 }
-
-export type ValidColorMap =  'inferno' | 'magma' | 'plasma' | 'viridis'
 
 const baseRed = 168
 const baseBlue = 70

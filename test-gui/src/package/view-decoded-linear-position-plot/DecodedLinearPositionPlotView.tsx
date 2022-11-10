@@ -1,9 +1,9 @@
 import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useRecordingSelectionTimeInitialization, useTimeRange, useTimeseriesMargins } from '@figurl/timeseries-views'
 import { Checkbox } from '@material-ui/core'
 import { FunctionComponent, useCallback, useMemo, useState } from 'react'
-import { ValidColorMap } from '../view-track-position-animation/TPADecodedPositionLayer'
+import { useColorStyles8Bit, ValidColorMap } from '../util-color-scales/ColorScales'
 import { computeScaleFactor, getDownsampledRange, getVisibleFrames, staticDownsample } from './DecodedLinearPositionDownsampling'
-import { getColorStyles, OffscreenRenderProps, useOffscreenCanvasRange, useOffscreenPainter, usePositions } from './DecodedLinearPositionDrawing'
+import { OffscreenRenderProps, useOffscreenCanvasRange, useOffscreenPainter, usePositions } from './DecodedLinearPositionDrawing'
 import { DecodedLinearPositionPlotData } from './DecodedLinearPositionPlotViewData'
 // import { TimeseriesLayoutOpts } from '@figurl/timeseries-views'
 
@@ -52,7 +52,7 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     useRecordingSelectionTimeInitialization(_startTimeSec, endTimeSec)
     const { visibleTimeStartSeconds, visibleTimeEndSeconds } = useTimeRange()
     const [showObservedPositionsOverlay, setShowObservedPositionsOverlay] = useState<boolean>(true)
-    const { colorStyles, contrastStyle } = useMemo(() => getColorStyles(DEFAULT_COLOR_MAP_CHOICE), [])
+    const { colorStyles, contrastColorStyle } = useMemo(() => useColorStyles8Bit(128, DEFAULT_COLOR_MAP_CHOICE), [])
 
     const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleTimeStartSeconds, visibleTimeEndSeconds)
     const visibleFrameRange = lastFrame - firstFrame
@@ -134,12 +134,12 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
                 displayRange,
                 showObservedPositionsOverlay,
                 scaledObservedPositions: scaledObserved,
-                observedPositionsStyle: contrastStyle,
+                observedPositionsStyle: contrastColorStyle,
                 downsampledStart,
                 downsampledEnd } as PanelProps,
             paint: paintPanel
         }]
-    }, [paintPanel, displayRange, downsampledStart, downsampledEnd, showObservedPositionsOverlay, scaledObserved, contrastStyle])
+    }, [paintPanel, displayRange, downsampledStart, downsampledEnd, showObservedPositionsOverlay, scaledObserved, contrastColorStyle])
     return (
         <div>
             <TimeScrollView
