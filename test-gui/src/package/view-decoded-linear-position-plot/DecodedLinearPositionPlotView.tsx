@@ -76,9 +76,9 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         return canvas
     }, [])
 
-    const { canvasPositions, targetHeight } = usePositions(MAX_OFFSCREEN_CANVAS_HEIGHT, positionsKey)
+    const { canvasPositions, pixelBinWidth, targetHeight } = usePositions(MAX_OFFSCREEN_CANVAS_HEIGHT, positionsKey)
     const canvasTargetWidth = useMemo(() => Math.min(MAX_OFFSCREEN_CANVAS_WIDTH, sampledData.downsampledTimes.length), [sampledData.downsampledTimes.length])
-    const painter = useOffscreenPainter(colorStyles, targetHeight, canvasPositions)
+    const painter = useOffscreenPainter(colorStyles, targetHeight, pixelBinWidth, canvasPositions)
     const offscreenRenderProps = useMemo(() => {
         const props: OffscreenRenderProps = {
             canvas,
@@ -113,10 +113,10 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
             context.beginPath()
             visibleObserved.forEach((v, i) => {
                 const x = i * xStepSize
-                const y = panelHeight * v
+                const y = (panelHeight * v) + 2
                 const deltaY = Math.abs(Math.floor(y) - Math.floor(lastY))
                 if ((Math.floor(lastX) !== Math.floor(x)) || (Math.floor(y) !== Math.floor(lastY))) {
-                    deltaY > (verticalEpsilonPx) ? context.moveTo(x, panelHeight * v) : context.lineTo(x, panelHeight * v)
+                    deltaY > (verticalEpsilonPx) ? context.moveTo(x, y) : context.lineTo(x, y)
                 }
                 lastX = x
                 lastY = y

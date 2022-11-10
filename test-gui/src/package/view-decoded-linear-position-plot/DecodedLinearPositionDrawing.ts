@@ -7,12 +7,15 @@ import { DownsampledData } from './DecodedLinearPositionDownsampling'
 
 export const usePositions = (maxOffscreenCanvasHeight: number, positionsKey: number[]) => {
     return useMemo(() => {
-        const basePosition = positionsKey[0] // bin coordinates are actually the top of the range
-        const lastPosition = (positionsKey.at(-1) ?? basePosition) + basePosition
+        const halfBinWidth = positionsKey[0] // bin coordinates are actually the *midpoint* of the range
+        // Note that bin widths can actually vary by segment, and the first bin need not always start from 0...
+        // but we're going to not worry about that for right now.
+        const lastPosition = (positionsKey.at(-1) ?? halfBinWidth) + halfBinWidth
         const vscale = Math.floor(maxOffscreenCanvasHeight/lastPosition)
-        const canvasPositions = [0, ...positionsKey, lastPosition].map(n => vscale * n)
+        const pixelHalfBinWidth = halfBinWidth * vscale
+        const canvasPositions = positionsKey.map(n => (vscale * n ) - pixelHalfBinWidth)
         const targetHeight = Math.ceil(vscale * lastPosition)
-        return { canvasPositions, targetHeight }
+        return { canvasPositions, pixelBinWidth: pixelHalfBinWidth * 2, targetHeight }
     }, [positionsKey, maxOffscreenCanvasHeight])
 }
 
@@ -112,7 +115,7 @@ const updateCachedImage = (targetStart: number, targetEnd: number, currentStart:
 }
 
 type OffscreenPainter = (startInclusive: number, width: number, pixelXOffset: number, sampleData: DownsampledData, c: CanvasRenderingContext2D) => void
-export const useOffscreenPainter = (styles: string[], height: number, myPositions: number[]) => {
+export const useOffscreenPainter = (styles: string[], height: number, binWidth: number, myPositions: number[]) => {
     const drawTimeIndex = useCallback((data: DownsampledData, firstDataIndex: number, timeIndex: number, xPosition: number, c: CanvasRenderingContext2D) => {
         const lastIndex = firstDataIndex + data.downsampledTimes[timeIndex]
         for (let dataIndex = firstDataIndex; dataIndex < lastIndex; dataIndex++) {
@@ -121,12 +124,12 @@ export const useOffscreenPainter = (styles: string[], height: number, myPosition
             c.strokeStyle = styles[value]
             c.beginPath()
             const startPixel = myPositions[position]
-            const endPixel = myPositions[position + 1]
+            const endPixel = startPixel + binWidth
             c.moveTo(xPosition, height - startPixel)
             c.lineTo(xPosition, height - endPixel)
             c.stroke()
         }
-    }, [styles, height, myPositions])
+    }, [styles, height, myPositions, binWidth])
 
     const clearRect = useCallback((width: number, pixelOffset: number, c: CanvasRenderingContext2D) => {
         c.fillStyle = styles[0]
