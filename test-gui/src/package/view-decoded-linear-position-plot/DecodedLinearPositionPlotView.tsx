@@ -101,24 +101,25 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         context.imageSmoothingEnabled = false
         context.drawImage(canvas, displayRange[0], 0, displayRange[1] - displayRange[0], canvas.height, 0, 0, panelWidth, panelHeight)
         if (showObservedPositionsOverlay && scaledObservedPositions !== undefined) {
-            const verticalEpsilon = 0.005
+            const verticalEpsilonPx = 4
             const alignedStart = downsampledStart * scaleFactor
             const alignedEnd = downsampledEnd * scaleFactor
             const visibleObserved = scaledObservedPositions.slice(alignedStart, alignedEnd + 1)
             const xStepSize = visibleObserved.length > 0 ? panelWidth / (visibleObserved.length) : 1
             context.strokeStyle = (observedPositionsStyle ?? '#000000')
             context.lineWidth = 2
-            let lastV = visibleObserved[0]  // TODO: would it be better to set the threshold as something like 2-3 pixels?
+            let lastY = -5
             let lastX = -5   // avoids performance loss from drawing sub-pixel points on top of each other. Negative value to handle first point right
             context.beginPath()
             visibleObserved.forEach((v, i) => {
                 const x = i * xStepSize
-                const deltaV = Math.abs(v - lastV)
-                if ((Math.floor(lastX) !== Math.floor(x)) || (deltaV > verticalEpsilon)) {
-                    deltaV > (verticalEpsilon) ? context.moveTo(x, panelHeight * v) : context.lineTo(x, panelHeight * v)
+                const y = panelHeight * v
+                const deltaY = Math.abs(Math.floor(y) - Math.floor(lastY))
+                if ((Math.floor(lastX) !== Math.floor(x)) || (Math.floor(y) !== Math.floor(lastY))) {
+                    deltaY > (verticalEpsilonPx) ? context.moveTo(x, panelHeight * v) : context.lineTo(x, panelHeight * v)
                 }
                 lastX = x
-                lastV = v
+                lastY = y
             })
             context.stroke()
         }
