@@ -14,8 +14,6 @@ type PositionProps = {
     frame: PositionFrame
     bottomMargin: number
 }
-// dotColor?: string // TODO: Make this configurable by adding a draw callback generator
-// dotRadius?: number
 
 type ObservedPositionStyling = {
     dotColor?: string
