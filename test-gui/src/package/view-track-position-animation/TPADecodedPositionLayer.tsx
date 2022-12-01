@@ -1,11 +1,10 @@
 import { BaseCanvas, DrawFn } from '@figurl/core-views'
-import { FunctionComponent, useCallback } from 'react'
-import { inferno, magma, plasma, viridis } from 'scale-color-perceptual'
-import { ValidColorMap } from '../util-color-scales/ColorScales'
+import { FunctionComponent, useCallback, useMemo } from 'react'
 import { DecodedPositionFramePx } from './TrackPositionAnimationTypes'
 
 // EXAMPLE:
 // https://figurl.org/f?v=http://localhost:3000&d=sha1://516fcb16508607f56e666a973451b06ab6fac35f&label=chimi-animation-v6b
+// 
 
 
 
@@ -27,45 +26,26 @@ type PeakPositionStyling = {
     drawPeakDot?: boolean
 }
 
-export const defaultPeakPositionStyling: PeakPositionStyling = {
+const defaultPeakPositionStyling: PeakPositionStyling = {
     dotRadius: 10,
     dotRgb: 'rgb(79, 227, 0)',
     drawPeakDot: true
 }
 
-const baseRed = 168
-const baseBlue = 70
-const baseGreen = 168
-
-const valuesRange = Array.from({length: 255}, (_, i) => i)
-// We have a pretty small number of actual possible values, so just precompute the styles.
-const stylesMap = {
-    // 'inferno': valuesRange.map(i => inferno(i/255)),
-    'inferno': valuesRange.map(i => inferno(Math.min(i/125, 1))),
-    // 'magma': valuesRange.map(i => magma(i/255)),
-    'magma': valuesRange.map(i => magma(Math.min(i/125, 1))),
-    // 'plasma': valuesRange.map(i => plasma(i/255)),
-    'plasma': valuesRange.map(i => plasma(Math.min(i/125, 1))),
-    // 'viridis': valuesRange.map(i => viridis(i/255)),
-    'viridis': valuesRange.map(i =>  viridis(Math.min(i/125, 1))),
-    'base': valuesRange.map((i) => `rgba(${baseRed}, ${baseBlue}, ${baseGreen}, ${i/5})`)
-}
-
-const drawPeakDot = (context: CanvasRenderingContext2D, peakCenterPx: number[], peakStyling?: PeakPositionStyling) => {
-    const style = { ...defaultPeakPositionStyling, ...peakStyling }
-    if (style.dotRgb === undefined || style.dotRadius === undefined || style.dotRadius < 1 || !style.drawPeakDot) {
+const drawPeakDot = (context: CanvasRenderingContext2D, peakCenterPx: number[], peakStyling: PeakPositionStyling) => {
+    if (peakStyling.dotRgb === undefined || peakStyling.dotRadius === undefined || peakStyling.dotRadius < 1 || !peakStyling.drawPeakDot) {
         console.warn(`Attempt to draw peak-probability dot with invalid settings -- no-op`)
         return
     }
     const [x, y] = [...peakCenterPx]
 
-    context.fillStyle = style.dotRgb ?? defaultPeakPositionStyling.dotRgb
+    context.fillStyle = peakStyling.dotRgb ?? defaultPeakPositionStyling.dotRgb
     context.beginPath()
-    context.arc(x, y, style.dotRadius, 0, 2 * Math.PI)
+    context.arc(x, y, peakStyling.dotRadius, 0, 2 * Math.PI)
     context.fill()
 }
 
-const draw = (context: CanvasRenderingContext2D, props: DecodeFrameProps, colorMap?: ValidColorMap, peakStyling?: PeakPositionStyling) => {
+const draw = (context: CanvasRenderingContext2D, props: DecodeFrameProps, colorStyles: string[], peakStyling: PeakPositionStyling) => {
     const { frame, peakCenterPx } = props
     if (!frame) return
     context.clearRect(0, 0, context.canvas.width, context.canvas.height)
@@ -77,7 +57,7 @@ const draw = (context: CanvasRenderingContext2D, props: DecodeFrameProps, colorM
     // TODO: Test whether we can expand the regions being drawn to create a smoother effect.
     // TODO: Maybe a useful form of preprocessing would convert the scalar value to the styles and then sort by those keys?
     values.forEach((v, i) => {
-        const style = stylesMap[colorMap || 'base'][v]
+        const style = colorStyles[v]
         context.beginPath()
         context.fillStyle = style
         context.strokeStyle = style
@@ -92,8 +72,9 @@ const draw = (context: CanvasRenderingContext2D, props: DecodeFrameProps, colorM
     peakCenterPx && drawPeakDot(context, peakCenterPx, peakStyling)
 }
 
-export const useConfiguredDecodedPositionDrawFunction = (colorMap?: ValidColorMap, peakStyling?: PeakPositionStyling) => {
-    return useCallback((context: CanvasRenderingContext2D, props: DecodeFrameProps) => draw(context, props, colorMap, peakStyling), [colorMap, peakStyling])
+export const useConfiguredDecodedPositionDrawFunction = (colorStyles: string[], peakStyling?: PeakPositionStyling) => {
+    const _peakStyling = useMemo(() => { return { ...defaultPeakPositionStyling, ...peakStyling }}, [peakStyling])
+    return useCallback((context: CanvasRenderingContext2D, props: DecodeFrameProps) => draw(context, props, colorStyles, _peakStyling), [colorStyles, _peakStyling])
 }
 
 const TPADecodedPositionLayer: FunctionComponent<DecodeLayerProps> = (props: DecodeLayerProps) => {
@@ -101,7 +82,6 @@ const TPADecodedPositionLayer: FunctionComponent<DecodeLayerProps> = (props: Dec
 
     return (
         <BaseCanvas<DecodeFrameProps>
-            // {...props} // can replace width/height/drawData with this, but eh
             width={width}
             height={height}
             draw={configuredDrawFnCallback}

@@ -1,47 +1,70 @@
-export type ValidColorMap =  'inferno' | 'magma' | 'plasma' | 'viridis'
+import { useMemo } from 'react'
 import { inferno, magma, plasma, viridis } from 'scale-color-perceptual'
+import { useStyleSettings } from '../context-style-settings/StyleSettingsContext'
+
+
+export type ValidColorMap =  'inferno' | 'magma' | 'plasma' | 'viridis' | 'legacy'
+export const ValidColorMapNames = ['inferno', 'magma', 'plasma', 'viridis', 'legacy']
 
 export type ColorStyleSet8Bit = {
     colorStyles: string[],
-    contrastColorStyle: string
+    primaryContrastColor: string,
+    secondaryContrastColor: string
 }
 
 export const DARK_DOVE_GREY = 'rgb(119, 118, 114)'
-
 // Complement colors come from https://www.learnui.design/tools/accessible-color-generator.html
-// Complement for viridis 0 (#440154) and 255 (#fbe723) is #4AC4E2, though that's not a great contrast with the midrange
-// of that scale (around #228b8d) so maybe look for a different one?
-// Complement for magma 0 (#000004) and 255 (#fcfbbd) is #6d70a9
-// Complement for inferno 0 (#000004) and 255 (#fafda1) is #6667bd
-// Complement for plasma 0 (#0d0887) and 255 (#f0f724) is #3c90c0, but consider #40cdff or #4597c7
-// Complement for default (whose 0 is #00003c) is #7361ff
-const ColorScaleContrastColors = {
-    'viridis': '#4ac4e2',
-    'magma': '#6d70a9',
+// viridis 0 (#440154) and 255 (#fbe723)
+// magma 0 (#000004) and 255 (#fcfbbd)
+// inferno 0 (#000004) and 255 (#fafda1)
+// plasma 0 (#0d0887) and 255 (#f0f724)
+// legacy (#00003c to #FFFF3C)
+const ColorScaleContrastColors = { //1b8211
+    'viridis': '#b94f3c',
+    'magma': '#649d61', //6d70a9
     'inferno':  '#6667bd',
-    'plasma': '#3c90c0'
+    'plasma': '#009f00', //'#3c90c0', but consider #40cdff or #4597c7
+    'legacy': '#7361ff'
 }
 
-// TODO: Get this from context? Or get the rangeMax from context? Or something?
-export const useColorStyles8Bit = (rangeMax: number = 128, map?: ValidColorMap): ColorStyleSet8Bit => {
-    const fn = (v: number | undefined): string => {
-        if (v === undefined) return "rgba(0, 0, 0, 0)"
-        const v_effective = Math.min(1, v/rangeMax)
-        switch (map) {
-            case 'inferno':
-                return inferno(v_effective)
-            case 'magma':
-                return magma(v_effective)
-            case 'plasma':
-                return plasma(v_effective)
-            case 'viridis':
-                return viridis(v_effective)
-            default:
-                const proportion = (v)
-                const intensity = Math.max(0, Math.min(255, Math.floor((255/rangeMax) * proportion)))
-                return `rgba(${intensity}, ${intensity}, 60, 255)`
+// These, especially, represent compromise, as it's very difficult to find multiple colors with
+// good contrast through the entire color scales.
+const SecondaryContrastColors = {
+    'viridis': '#ada8aa', // this is a real compromise, muddy midsection--also consider fire-engine red ff0013
+    'magma': '#8f0000',
+    'inferno':  '#80d9dc',
+    'plasma': '#71726c', // could have better contrast with primary...
+    'legacy': '#ffceb8' // this is also not great for saturation but we probably won't use this scale much anyway
+}
+
+// Note: the legacy color scheme for the 2d animation was rgba(168, 70, 168, v/5).
+
+export const useColorStyles8Bit = (): ColorStyleSet8Bit => {
+    const { styleSettings } = useStyleSettings()
+    const { colorMap, colorMapRangeMax } = styleSettings
+    const styles = useMemo(() => {
+        const fn = (v: number | undefined): string => {
+            if (v === undefined) return "rgba(0, 0, 0, 0)"
+            const v_effective = Math.min(1, v/colorMapRangeMax)
+            switch (colorMap) {
+                case 'inferno':
+                    return inferno(v_effective)
+                case 'magma':
+                    return magma(v_effective)
+                case 'plasma':
+                    return plasma(v_effective)
+                case 'viridis':
+                    return viridis(v_effective)
+                case 'legacy':
+                    const proportion = (v)
+                    const intensity = Math.max(0, Math.min(255, Math.floor((255/colorMapRangeMax) * proportion)))
+                    return `rgba(${intensity}, ${intensity}, 60, 255)`
+                default:
+                    throw Error(`Unreachable: from switch on colormap type (${colorMap}) in useColorStyles8Bit.`)
+            }
         }
-    }
-    const styles = Array.from({length: 256}).map((v, i) => fn(i))
-    return { colorStyles: styles, contrastColorStyle: map === undefined ? '#7361ff' : ColorScaleContrastColors[map] }
+        const styles = Array.from({length: 256}).map((v, i) => fn(i))
+        return styles
+    }, [colorMap, colorMapRangeMax])
+    return { colorStyles: styles, primaryContrastColor: ColorScaleContrastColors[colorMap], secondaryContrastColor: SecondaryContrastColors[colorMap] }
 }

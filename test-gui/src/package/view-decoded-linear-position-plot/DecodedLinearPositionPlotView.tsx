@@ -1,7 +1,9 @@
 import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useRecordingSelectionTimeInitialization, useTimeRange, useTimeseriesMargins } from '@figurl/timeseries-views'
 import { Checkbox } from '@material-ui/core'
 import { FunctionComponent, useCallback, useMemo, useState } from 'react'
-import { useColorStyles8Bit, ValidColorMap } from '../util-color-scales/ColorScales'
+import { useStyleSettings } from '../context-style-settings/StyleSettingsContext'
+import ColorControl from '../util-color-scales/ColorControl'
+import { useColorStyles8Bit } from '../util-color-scales/ColorScales'
 import { computeScaleFactor, getDownsampledRange, getVisibleFrames, staticDownsample } from './DecodedLinearPositionDownsampling'
 import { OffscreenRenderProps, useOffscreenCanvasRange, useOffscreenPainter, usePositions } from './DecodedLinearPositionDrawing'
 import { DecodedLinearPositionPlotData } from './DecodedLinearPositionPlotViewData'
@@ -14,8 +16,6 @@ const MAX_OFFSCREEN_CANVAS_WIDTH = 2000
 const MAX_OFFSCREEN_CANVAS_HEIGHT = 1000
 const DEFAULT_SAMPLES_PER_SECOND = 1000
 
-const DEFAULT_COLOR_MAP_CHOICE: ValidColorMap | undefined = 'viridis'
-
 // THIS SHOULD BE AN IMPORT FROM TIMESERIES-VIEWS
 type TimeseriesLayoutOpts = {
     hideToolbar?: boolean
@@ -26,6 +26,7 @@ type TimeseriesLayoutOpts = {
 type DecodedLinearPositionProps = {
     data: DecodedLinearPositionPlotData
     timeseriesLayoutOpts?: TimeseriesLayoutOpts
+    controlsSatisfied?: boolean
     width: number
     height: number
 }
@@ -44,7 +45,7 @@ const emptyPanelSelection = new Set<number | string>()
 
 
 const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProps> = (props: DecodedLinearPositionProps) => {
-    const { data, timeseriesLayoutOpts, width, height } = props
+    const { data, timeseriesLayoutOpts, controlsSatisfied, width, height } = props
     const { values, positions, frameBounds, positionsKey, startTimeSec, samplingFrequencyHz, observedPositions } = data
     const _startTimeSec = startTimeSec ?? 0
     const _samplingFrequencyHz = samplingFrequencyHz ?? DEFAULT_SAMPLES_PER_SECOND
@@ -52,7 +53,8 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     useRecordingSelectionTimeInitialization(_startTimeSec, endTimeSec)
     const { visibleTimeStartSeconds, visibleTimeEndSeconds } = useTimeRange()
     const [showObservedPositionsOverlay, setShowObservedPositionsOverlay] = useState<boolean>(true)
-    const { colorStyles, contrastColorStyle } = useMemo(() => useColorStyles8Bit(128, DEFAULT_COLOR_MAP_CHOICE), [])
+        
+    const { colorStyles, primaryContrastColor: contrastColorStyle } = useColorStyles8Bit()
 
     const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleTimeStartSeconds, visibleTimeEndSeconds)
     const visibleFrameRange = lastFrame - firstFrame
@@ -66,7 +68,10 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     const scaledObserved = useMemo(() => observedPositions === undefined ? undefined : observedPositions.map(p => 1 - (p/lastPosition)), [lastPosition, observedPositions])
 
     const margins = useTimeseriesMargins(timeseriesLayoutOpts)
-    const adjustedHeight = observedPositions ? height - 30 : height // leave an additional margin for the checkbox if we have linear positions to display
+    // add in buffer for color control and observed-positions checkbox
+    // const heightOffset = (observedPositions ? 30 : 0) + (controlsSatisfied ? 0 : 70)
+    const heightOffset = ((observedPositions || !controlsSatisfied) ? 35 : 0)
+    const adjustedHeight = height - heightOffset
     const panelCount = 1
     const toolbarWidth = timeseriesLayoutOpts?.hideToolbar ? 0 : DefaultToolbarWidth
     const { panelWidth, panelHeight } = usePanelDimensions(width - toolbarWidth, adjustedHeight, panelCount, panelSpacing, margins)
@@ -125,6 +130,25 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         }
     }, [canvas, panelWidth, panelHeight, scaleFactor])
 
+    const { styleSettings, styleSettingsDispatch } = useStyleSettings()
+    const colorControls = ColorControl({dispatch: styleSettingsDispatch, colorMap: styleSettings.colorMap, rangeMax: styleSettings.colorMapRangeMax})
+    const controlSection = heightOffset === 0 ? <span/> : <div style={{height: "35px", display: "flex"}}>
+            {
+                observedPositions && (
+                    <span style={{paddingTop: '5px', paddingLeft: '30px'}}>
+                        <Checkbox style={{paddingTop: 0, paddingBottom: 5}} checked={showObservedPositionsOverlay} onClick={() => {setShowObservedPositionsOverlay(a => (!a))}} />
+                        Show actual position overlay
+                    </span>
+                )
+            }
+            {
+                !controlsSatisfied && (
+                    <span style={{paddingLeft: '10px'}}>
+                        {colorControls}
+                    </span>
+                )
+            }
+        </div>
 
     const panels: TimeScrollViewPanel<PanelProps>[] = useMemo(() => {
         return [{
@@ -151,14 +175,7 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
                 width={width}
                 height={adjustedHeight}
             />
-            {
-                observedPositions && (
-                    <span>
-                        <Checkbox style={{paddingTop: 0, paddingBottom: 5}} checked={showObservedPositionsOverlay} onClick={() => {setShowObservedPositionsOverlay(a => (!a))}} />
-                        Show actual position overlay
-                    </span>
-                )
-            }
+            {controlSection}
         </div>
     )
 }

@@ -32,6 +32,7 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
     const contentsStart = useRef<number>(0)
     const contentsEnd = useRef<number>(0)
     const currentScale = useRef<number>(0)
+    const currentPainter = useRef<OffscreenPainter>()
     const { canvas, canvasTargetWidth, canvasTargetHeight, painter, scale, sampledData, downsampledRangeStart, downsampledRangeEnd } = props
 
     if (canvas === undefined) return [0, 0]
@@ -41,6 +42,14 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
         currentScale.current = scale
         contentsStart.current = 0
         contentsEnd.current = 0
+    }
+
+    // If we change the styling, we have to invalidate the whole offscreen canvas cache,
+    // or else the image won't respond to the controls.
+    if (currentPainter.current !== painter) {
+        contentsStart.current = 0
+        contentsEnd.current = 0
+        currentPainter.current = painter
     }
 
     // NOTE: React wants to resize this canvas on every soft reload. I don't expect it to be a problem generally, but
