@@ -1,7 +1,6 @@
 import { ViewComponentProps } from "@figurl/core-views"
 import { FunctionComponent } from "react"
-import DecodedLinearPositionPlotView from "./view-decoded-linear-position-plot/DecodedLinearPositionPlotView"
-import { isDecodedLinearPositionPlotData } from "./view-decoded-linear-position-plot/DecodedLinearPositionPlotViewData"
+import { DecodedLinearPositionPlotView, isDecodedLinearPositionPlotData } from "./view-decoded-linear-position-plot"
 import { isTrackAnimationStaticData, TrackPositionAnimationView } from "./view-track-position-animation"
 
 const loadView = (o: {data: unknown, width: number, height: number, opts: unknown, ViewComponent: FunctionComponent<ViewComponentProps>}) => {

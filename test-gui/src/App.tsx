@@ -5,6 +5,7 @@ import { defaultRecordingSelection, RecordingSelectionContext, recordingSelectio
 import { MuiThemeProvider } from '@material-ui/core';
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import './localStyles.css';
+import { SetupStyleSettings } from './package';
 import theme from './theme';
 import View from './View';
 
@@ -69,12 +70,14 @@ function App() {
         <UnitSelectionContext.Provider value={{unitSelection, unitSelectionDispatch}}>
           <SetupAnnotations>
             <SetupUrlState>
-              <View
-                data={data}
-                opts={opts}
-                width={width - 10}
-                height={height - 5}
-              />
+                <SetupStyleSettings>
+                    <View
+                        data={data}
+                        opts={opts}
+                        width={width - 10}
+                        height={height - 5}
+                    />
+                </SetupStyleSettings>
             </SetupUrlState>
           </SetupAnnotations>
         </UnitSelectionContext.Provider>

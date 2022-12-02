@@ -35,11 +35,13 @@
     "@figurl/interface": "^0.1",
     "@figurl/spike-sorting-views": "^0.1",
     "@figurl/timeseries-views": "^0.1",
+    "@types/material-ui": "^0.21.12",
     "@types/node": "^18.7.18",
     "assert": "npm:assert-browserify",
     "buffer": "npm:buffer-browserify",
     "crypto": "npm:crypto-browserify",
     "github-markdown-css": "^5.1.0",
+    "material-ui-slider": "^3.0.8",
     "react-select": "^5.4.0",
     "scale-color-perceptual": "^1.1.2"
   }

@@ -2,10 +2,13 @@ import { Margins, TwoDTransformProps, use2DTransformationMatrix, useAspectTrimmi
 import { useRecordingSelectionTimeInitialization, useTimeFocus } from '@figurl/timeseries-views'
 import { matrix, Matrix, multiply, transpose } from 'mathjs'
 import React, { FunctionComponent, useEffect, useMemo } from "react"
+import { useStyleSettings } from '../context-style-settings/StyleSettingsContext'
 import { AnimationOptionalFeatures, AnimationState, AnimationStateAction, AnimationStateReducer, BOOKMARK_BUTTON, CROP_BUTTON, FrameAnimation, makeDefaultState, PlaybackOptionalButtons, SYNC_BUTTON, useLiveTimeSyncing, useTimeWindowSyncing, useUrlPlaybackWindowSupport } from '../util-animation'
+import { useColorStyles8Bit } from '../util-color-scales'
+import ColorControl from '../util-color-scales/ColorControl'
 import TPADecodedPositionLayer, { useConfiguredDecodedPositionDrawFunction } from './TPADecodedPositionLayer'
 import { getDecodedPositionFramePx, useProbabilityFrames, useProbabilityLocationsMap } from './TPADecodedPositionLogic'
-import TPAPositionLayer from './TPAPositionLayer'
+import TPAPositionLayer, { useConfiguredObservedPositionDrawFunction } from './TPAPositionLayer'
 import TPATrackLayer from './TPATrackLayer'
 import { DecodedPositionData, DecodedPositionFrame, PositionFrame, TrackAnimationStaticData } from "./TrackPositionAnimationTypes"
 
@@ -13,11 +16,13 @@ import { DecodedPositionData, DecodedPositionFrame, PositionFrame, TrackAnimatio
 
 export type TrackPositionAnimationProps = {
     data: TrackAnimationStaticData
+    colorControlsSatisfied?: boolean
     width: number
     height: number
 }
 
 const controlsHeight = 40
+const colorControlsHeight = 35
 
 const defaultMargins: Margins = {
     left: 10,
@@ -120,11 +125,12 @@ const initialState = makeDefaultState<PositionFrame>()
 const getTimeFromFrame = (frame: PositionFrame | undefined) => frame?.timestamp ?? -1
 
 const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps> = (props: TrackPositionAnimationProps) => {
-    const { data, width, height } = props
+    const { data, width, height, colorControlsSatisfied } = props
     const { xmin, xmax, ymin, ymax, headDirection, samplingFrequencyHz } = data
 
     const [animationState, animationStateDispatch] = React.useReducer<TPAReducer>(AnimationStateReducer, initialState)
-    const drawHeight = height - controlsHeight
+    const canvasHeight = height - (colorControlsSatisfied ? 0 : colorControlsHeight)
+    const drawHeight = canvasHeight - controlsHeight
     const { finalMargins, transform } = useDrawingSpace(width, drawHeight, xmax, xmin, ymax, ymin)
     const trackBins = useTrackBinPixelDimensions(transform, data.trackBinULCorners, data.trackBinWidth, data.trackBinHeight)
 
@@ -137,6 +143,8 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
 
     useRecordingSelectionTimeInitialization(data.timestamps[0] + (data.timestampStart ?? 0), data.timestamps[data.timestamps.length - 1] + (data.timestampStart ?? 0))
     
+    const { colorStyles, primaryContrastColor, secondaryContrastColor } = useColorStyles8Bit()
+
     useEffect(() => {
         animationStateDispatch({
             type: 'UPDATE_FRAME_DATA',
@@ -177,44 +185,60 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
     const currentPositionFrame = useMemo(() => {
         return {
             bottomMargin: finalMargins.bottom,
-            frame: animationState.frameData[animationState.currentFrameIndex],
+            frame: animationState.frameData[animationState.currentFrameIndex]
         }
     }, [animationState.currentFrameIndex, animationState.frameData, finalMargins.bottom])
-
+    
+    // set dot radius to be the floor of half a bin diagonal
+    const positionDotRadius = useMemo(() => {
+        return Math.max(Math.floor(Math.sqrt((Math.pow(trackBins[0][2], 2)) + Math.pow(trackBins[0][3], 2))/2), 1)
+    }, [trackBins])
+    
     const trackLayer = useMemo(() => <TPATrackLayer
             width={width}
             height={drawHeight}
             trackBucketRectanglesPx={trackBins}
-        />, [width, drawHeight, trackBins])
-
-    const configuredDecodedPositionDrawFn = useConfiguredDecodedPositionDrawFunction('plasma')
+            trackColor={colorStyles[0]}
+        />, [width, drawHeight, trackBins, colorStyles])
+    
+    const peakStyling = useMemo(() => { return { dotRadius: positionDotRadius, drawPeakDot: true, dotRgb: secondaryContrastColor }}, [positionDotRadius, secondaryContrastColor])
+    const configuredDecodedPositionDrawFn = useConfiguredDecodedPositionDrawFunction(colorStyles, peakStyling)
     const probabilityLayer = useMemo(() => <TPADecodedPositionLayer
             width={width}
             height={drawHeight}
             drawData={currentProbabilityFrame}
             configuredDrawFnCallback={configuredDecodedPositionDrawFn}
         />, [width, drawHeight, currentProbabilityFrame, configuredDecodedPositionDrawFn])
-
+    
+    const observedPositionStyling = useMemo(() => { return { dotColor: primaryContrastColor, dotRadius: positionDotRadius }}, [primaryContrastColor, positionDotRadius])
+    const configuredObservedDrawFn = useConfiguredObservedPositionDrawFunction(observedPositionStyling)
     const positionLayer = useMemo(() => <TPAPositionLayer
             width={width}
             height={drawHeight}
             drawData={currentPositionFrame}
-        />, [width, drawHeight, currentPositionFrame])
+            configuredDrawFnCallback={configuredObservedDrawFn}
+        />, [width, drawHeight, currentPositionFrame, configuredObservedDrawFn])
+
+    const { styleSettings, styleSettingsDispatch } = useStyleSettings()
+    const controlSection = ColorControl({dispatch: styleSettingsDispatch, colorMap: styleSettings.colorMap, rangeMax: styleSettings.colorMapRangeMax })
 
     return (
-        <FrameAnimation
-            width={width}
-            height={height}
-            controlsHeight={controlsHeight}
-            state={animationState}
-            dispatch={animationStateDispatch}
-            dataSeriesFrameRateHz={samplingFrequencyHz}
-            options={optionalPlaybackControls}
-        >
-            {trackLayer}
-            {probabilityLayer}
-            {positionLayer}
-        </FrameAnimation>
+        <div style={{height: height}}>
+            <FrameAnimation
+                width={width}
+                height={canvasHeight}
+                controlsHeight={controlsHeight}
+                state={animationState}
+                dispatch={animationStateDispatch}
+                dataSeriesFrameRateHz={samplingFrequencyHz}
+                options={optionalPlaybackControls}
+            >
+                {trackLayer}
+                {probabilityLayer}
+                {positionLayer}
+            </FrameAnimation>
+            {!colorControlsSatisfied && <div style={{height: colorControlsHeight, position: 'absolute', top: height - colorControlsHeight}}> {controlSection} </div>}
+        </div>
     )
 }
 
