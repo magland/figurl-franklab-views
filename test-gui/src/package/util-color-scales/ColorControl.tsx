@@ -1,4 +1,5 @@
 import Slider from '@material-ui/core/Slider'
+import { createTheme, ThemeProvider } from '@material-ui/core/styles'
 import { useCallback, useMemo } from 'react'
 import Select from 'react-select'
 import { StyleSettingsAction } from '../context-style-settings'
@@ -56,11 +57,9 @@ const MapSelector = (props: ColorMapSelectorProps) => {
     return span
 }
 
-// const sliderStyles = makeStyles({
-//     root: {
-//         width: 200,
-//     }
-// })()
+const theme = createTheme({
+    direction: 'rtl'
+})
 
 const RangeSelector = (props: ColorMapRangeProps) => {
     const { dispatch, rangeMax } = props
@@ -80,14 +79,16 @@ const RangeSelector = (props: ColorMapRangeProps) => {
         return (
             // <div className={sliderStyles.root}>
             <span className='tooltip' style={{width: "256px", display: "block", paddingLeft: "15px", paddingRight: "15px", paddingTop: "5px"}}>
-                <Slider
-                    aria-label="Color range maximum"
-                    min={1}
-                    max={256}
-                    onChange={updateValue}
-                    value={rangeMax}
-                    valueLabelDisplay="auto"
-                />
+                <ThemeProvider theme={theme}>
+                    <Slider
+                        aria-label="Color range maximum"
+                        min={1}
+                        max={256}
+                        onChange={updateValue}
+                        value={rangeMax}
+                        valueLabelDisplay="auto"
+                    />
+                </ThemeProvider>
                 <div className="tooltiptext">
                     Set the upper end of the dynamic range (1-256 scale). Values above this number will be compressed to max intensity.
                 </div>
