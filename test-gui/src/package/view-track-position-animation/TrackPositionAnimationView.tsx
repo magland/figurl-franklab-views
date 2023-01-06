@@ -1,5 +1,5 @@
 import { Margins, TwoDTransformProps, use2DTransformationMatrix, useAspectTrimming } from '@figurl/core-views'
-import { useRecordingSelectionTimeInitialization, useTimeFocus } from '@figurl/timeseries-views'
+import { useTimeseriesSelection, useTimeseriesSelectionInitialization } from '@figurl/timeseries-views'
 import { matrix, Matrix, multiply, transpose } from 'mathjs'
 import React, { FunctionComponent, useEffect, useMemo } from "react"
 import { useStyleSettings } from '../context-style-settings/StyleSettingsContext'
@@ -141,7 +141,7 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
     const dataFrames = useFrames(data.positions, decodedData, transform, headDirection, data.timestampStart, data.timestamps)
     const decodedLocationsMap = useProbabilityLocationsMap(transform, decodedData)
 
-    useRecordingSelectionTimeInitialization(data.timestamps[0] + (data.timestampStart ?? 0), data.timestamps[data.timestamps.length - 1] + (data.timestampStart ?? 0))
+    useTimeseriesSelectionInitialization(data.timestamps[0] + (data.timestampStart ?? 0), data.timestamps[data.timestamps.length - 1] + (data.timestampStart ?? 0))
     
     const { colorStyles, primaryContrastColor, secondaryContrastColor } = useColorStyles8Bit()
 
@@ -153,10 +153,10 @@ const TrackPositionAnimationView: FunctionComponent<TrackPositionAnimationProps>
         })
     }, [dataFrames])
 
-    const { focusTime, setTimeFocus } = useTimeFocus()  // state imported from recording context
+    const { currentTime, setCurrentTime } = useTimeseriesSelection()  // state imported from recording context
 
-    const { handleOutsideTimeUpdate, handleFrameTimeUpdate } = useLiveTimeSyncing(setTimeFocus, animationState, animationStateDispatch, getTimeFromFrame)
-    useEffect(() => handleOutsideTimeUpdate(focusTime), [handleOutsideTimeUpdate, focusTime])
+    const { handleOutsideTimeUpdate, handleFrameTimeUpdate } = useLiveTimeSyncing(setCurrentTime, animationState, animationStateDispatch, getTimeFromFrame)
+    useEffect(() => handleOutsideTimeUpdate(currentTime), [handleOutsideTimeUpdate, currentTime])
     useEffect(() => handleFrameTimeUpdate(), [handleFrameTimeUpdate])
 
     useTimeWindowSyncing(animationState, animationStateDispatch, getTimeFromFrame)

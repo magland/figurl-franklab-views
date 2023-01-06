@@ -1,7 +1,7 @@
 import { useWindowDimensions } from '@figurl/core-utils';
 import { getFigureData, SetupUrlState, startListeningToParent } from '@figurl/interface';
 import { defaultUnitSelection, UnitSelectionContext, unitSelectionReducer } from '@figurl/spike-sorting-views';
-import { defaultRecordingSelection, RecordingSelectionContext, recordingSelectionReducer, SetupAnnotations } from '@figurl/timeseries-views';
+import { defaultTimeseriesSelection, TimeseriesSelectionContext, timeseriesSelectionReducer, SetupAnnotations } from '@figurl/timeseries-views';
 import { MuiThemeProvider } from '@material-ui/core';
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import './localStyles.css';
@@ -18,7 +18,7 @@ function App() {
   const {width, height} = useWindowDimensions()
 
   const [unitSelection, unitSelectionDispatch] = useReducer(unitSelectionReducer, defaultUnitSelection)
-  const [recordingSelection, recordingSelectionDispatch] = useReducer(recordingSelectionReducer, defaultRecordingSelection)
+  const [timeseriesSelection, timeseriesSelectionDispatch] = useReducer(timeseriesSelectionReducer, defaultTimeseriesSelection)
 
   useEffect(() => {
     if (queryParams.test === '1') {
@@ -66,7 +66,7 @@ function App() {
 
   return (
     <MuiThemeProvider theme={theme}>
-      <RecordingSelectionContext.Provider value={{recordingSelection, recordingSelectionDispatch}}>
+      <TimeseriesSelectionContext.Provider value={{timeseriesSelection, timeseriesSelectionDispatch}}>
         <UnitSelectionContext.Provider value={{unitSelection, unitSelectionDispatch}}>
           <SetupAnnotations>
             <SetupUrlState>
@@ -81,7 +81,7 @@ function App() {
             </SetupUrlState>
           </SetupAnnotations>
         </UnitSelectionContext.Provider>
-      </RecordingSelectionContext.Provider>
+      </TimeseriesSelectionContext.Provider>
     </MuiThemeProvider>
   )
 }

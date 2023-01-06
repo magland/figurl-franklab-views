@@ -1,4 +1,4 @@
-import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useRecordingSelectionTimeInitialization, useTimeRange, useTimeseriesMargins } from '@figurl/timeseries-views'
+import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useTimeseriesSelectionInitialization, useTimeRange, useTimeseriesMargins } from '@figurl/timeseries-views'
 import { Checkbox } from '@material-ui/core'
 import { FunctionComponent, useCallback, useMemo, useState } from 'react'
 import { useStyleSettings } from '../context-style-settings/StyleSettingsContext'
@@ -50,13 +50,13 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
     const _startTimeSec = startTimeSec ?? 0
     const _samplingFrequencyHz = samplingFrequencyHz ?? DEFAULT_SAMPLES_PER_SECOND
     const endTimeSec = _startTimeSec + frameBounds.length / _samplingFrequencyHz
-    useRecordingSelectionTimeInitialization(_startTimeSec, endTimeSec)
-    const { visibleTimeStartSeconds, visibleTimeEndSeconds } = useTimeRange()
+    useTimeseriesSelectionInitialization(_startTimeSec, endTimeSec)
+    const { visibleStartTimeSec, visibleEndTimeSec } = useTimeRange()
     const [showObservedPositionsOverlay, setShowObservedPositionsOverlay] = useState<boolean>(true)
         
     const { colorStyles, primaryContrastColor: contrastColorStyle } = useColorStyles8Bit()
 
-    const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleTimeStartSeconds, visibleTimeEndSeconds)
+    const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleStartTimeSec, visibleEndTimeSec)
     const visibleFrameRange = lastFrame - firstFrame
     
     const scaleFactor = computeScaleFactor(BASE_SCALE_FACTOR, visibleFrameRange, MAX_WIDTH_FOR_SCALING)

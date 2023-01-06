@@ -53,7 +53,7 @@ export const useTimeLookupFn = <T, >(animationState: AnimationState<T>, getTimeF
 
 type liveSyncFrameToOutsideTimeProps = {
     outsideTime: number | undefined
-    checkNewTimeWithinEpsilon: (focusTime: number | undefined, replayRateMultiplier: number) => boolean
+    checkNewTimeWithinEpsilon: (currentTime: number | undefined, replayRateMultiplier: number) => boolean
     multiplier: number
     cancelPendingUpdateOfOutsideTime: () => void
     findNearestTime: (time: number) => BstSearchResult<number> | undefined
