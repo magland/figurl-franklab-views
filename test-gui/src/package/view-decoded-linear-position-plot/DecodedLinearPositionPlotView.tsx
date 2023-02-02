@@ -1,4 +1,4 @@
-import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useTimeseriesSelectionInitialization, useTimeRange, useTimeseriesMargins } from '@figurl/timeseries-views'
+import { DefaultToolbarWidth, TimeScrollView, TimeScrollViewPanel, usePanelDimensions, useTimeRange, useTimeseriesMargins, useTimeseriesSelectionInitialization } from '@figurl/timeseries-views'
 import { Checkbox } from '@material-ui/core'
 import { FunctionComponent, useCallback, useMemo, useState } from 'react'
 import { useStyleSettings } from '../context-style-settings/StyleSettingsContext'
@@ -37,7 +37,8 @@ type PanelProps = {
     scaledObservedPositions: number[] | undefined
     observedPositionsStyle: string | undefined
     downsampledStart: number
-    downsampledEnd: number
+    downsampledEnd: number // the end of the window into the data, in downsampled terms
+    downsampledMax: number // the end of extant data, when there isn't enough data to fill the viewing area
 }
 
 const panelSpacing = 4
@@ -56,11 +57,17 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
         
     const { colorStyles, primaryContrastColor: contrastColorStyle } = useColorStyles8Bit()
 
-    const {firstFrame, lastFrame} = getVisibleFrames(_startTimeSec, _samplingFrequencyHz, frameBounds.length, visibleStartTimeSec, visibleEndTimeSec)
+    const { firstFrame, lastFrame, lastExtantFrame } = getVisibleFrames({
+        _startTimeSec,
+        _samplingFrequencyHz,
+        dataLength: frameBounds.length,
+        visibleTimeStartSeconds: visibleStartTimeSec,
+        visibleTimeEndSeconds: visibleEndTimeSec,
+        dataEndSeconds: endTimeSec})
     const visibleFrameRange = lastFrame - firstFrame
     
     const scaleFactor = computeScaleFactor(BASE_SCALE_FACTOR, visibleFrameRange, MAX_WIDTH_FOR_SCALING)
-    const { downsampledStart, downsampledEnd } = getDownsampledRange(scaleFactor, firstFrame, lastFrame)
+    const { downsampledStart, downsampledEnd, downsampledLastExtant } = getDownsampledRange(scaleFactor, firstFrame, lastFrame, lastExtantFrame)
 
     // Possibility: would it be reasonable to cache every downsampling level we touch? Could become memory-prohibitive...
     const sampledData = useMemo(() => staticDownsample(values, positions, frameBounds, scaleFactor), [values, positions, frameBounds, scaleFactor])
@@ -93,15 +100,16 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
             scale: scaleFactor,
             sampledData,
             downsampledRangeStart: downsampledStart,
-            downsampledRangeEnd: downsampledEnd
+            downsampledRangeEnd: downsampledEnd,
+            downsampledRangeMax: downsampledLastExtant
         }
         return props
-    }, [canvas, targetHeight, scaleFactor, sampledData, downsampledStart, downsampledEnd, canvasTargetWidth, painter])
+    }, [canvas, targetHeight, scaleFactor, sampledData, downsampledStart, downsampledEnd, downsampledLastExtant, canvasTargetWidth, painter])
     const displayRange = useOffscreenCanvasRange(offscreenRenderProps)
 
     const paintPanel = useCallback((context: CanvasRenderingContext2D, props: PanelProps) => {
         if (canvas === undefined) return
-        const {displayRange, showObservedPositionsOverlay, scaledObservedPositions, observedPositionsStyle, downsampledStart, downsampledEnd} = props
+        const {displayRange, showObservedPositionsOverlay, scaledObservedPositions, observedPositionsStyle, downsampledStart, downsampledEnd, downsampledMax} = props
         context.clearRect(0, 0, context.canvas.width, context.canvas.height)
         context.imageSmoothingEnabled = false
         context.drawImage(canvas, displayRange[0], 0, displayRange[1] - displayRange[0], canvas.height, 0, 0, panelWidth, panelHeight)
@@ -109,8 +117,10 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
             const verticalEpsilonPx = 4
             const alignedStart = downsampledStart * scaleFactor
             const alignedEnd = downsampledEnd * scaleFactor
+            // handle the case where we run out of data before we run out of canvas
+            const usablePanelShare = (downsampledMax - downsampledStart) / (downsampledEnd - downsampledStart)
             const visibleObserved = scaledObservedPositions.slice(alignedStart, alignedEnd + 1)
-            const xStepSize = visibleObserved.length > 0 ? panelWidth / (visibleObserved.length) : 1
+            const xStepSize = visibleObserved.length > 0 ? panelWidth * usablePanelShare / (visibleObserved.length) : 1
             context.strokeStyle = (observedPositionsStyle ?? '#000000')
             context.lineWidth = 2
             let lastY = -5
@@ -160,10 +170,11 @@ const DecodedLinearPositionPlotView: FunctionComponent<DecodedLinearPositionProp
                 scaledObservedPositions: scaledObserved,
                 observedPositionsStyle: contrastColorStyle,
                 downsampledStart,
-                downsampledEnd } as PanelProps,
+                downsampledEnd,
+                downsampledMax: downsampledLastExtant } as PanelProps,
             paint: paintPanel
         }]
-    }, [paintPanel, displayRange, downsampledStart, downsampledEnd, showObservedPositionsOverlay, scaledObserved, contrastColorStyle])
+    }, [paintPanel, displayRange, downsampledStart, downsampledEnd, downsampledLastExtant, showObservedPositionsOverlay, scaledObserved, contrastColorStyle])
     return (
         <div>
             <TimeScrollView

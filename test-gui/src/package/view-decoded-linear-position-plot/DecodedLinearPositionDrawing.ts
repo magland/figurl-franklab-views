@@ -25,6 +25,7 @@ export type OffscreenRenderProps = {
     scale: number
     downsampledRangeStart: number
     downsampledRangeEnd: number
+    downsampledRangeMax: number
 }
 // Given a Canvas with stuff drawn on it and a data set, and a desired range of data from the data set,
 // return the x-coordinate pixel range in the offscreen canvas that contains the requested data range.
@@ -33,7 +34,7 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
     const contentsEnd = useRef<number>(0)
     const currentScale = useRef<number>(0)
     const currentPainter = useRef<OffscreenPainter>()
-    const { canvas, canvasTargetWidth, canvasTargetHeight, painter, scale, sampledData, downsampledRangeStart, downsampledRangeEnd } = props
+    const { canvas, canvasTargetWidth, canvasTargetHeight, painter, scale, sampledData, downsampledRangeStart, downsampledRangeEnd, downsampledRangeMax } = props
 
     if (canvas === undefined) return [0, 0]
 
@@ -62,10 +63,8 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
     }
 
     console.assert(contentsStart.current <= contentsEnd.current)
-    if ((downsampledRangeEnd - downsampledRangeStart) > (canvas.width)) {
-        // jfm turned this error into a warning on 2/1/23
-        console.warn(`Impossible situation: requested window ${downsampledRangeStart}-${downsampledRangeEnd} does not fit in canvas width ${canvas.width} as allowed by current scale factor ${scale}`)
-        // throw Error(`Impossible situation: requested window ${downsampledRangeStart}-${downsampledRangeEnd} does not fit in canvas width ${canvas.width} as allowed by current scale factor ${scale}`)
+    if ((Math.min(downsampledRangeEnd, downsampledRangeMax) - downsampledRangeStart) > (canvas.width)) {
+        throw Error(`Impossible situation: requested window ${downsampledRangeStart}-${downsampledRangeEnd} does not fit in canvas width ${canvas.width} as allowed by current scale factor ${scale}`)
     }
 
     // Request can be served from cache--do so
