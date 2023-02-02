@@ -63,7 +63,9 @@ export const useOffscreenCanvasRange = (props: OffscreenRenderProps): [number, n
 
     console.assert(contentsStart.current <= contentsEnd.current)
     if ((downsampledRangeEnd - downsampledRangeStart) > (canvas.width)) {
-        throw Error(`Impossible situation: requested window ${downsampledRangeStart}-${downsampledRangeEnd} does not fit in canvas width ${canvas.width} as allowed by current scale factor ${scale}`)
+        // jfm turned this error into a warning on 2/1/23
+        console.warn(`Impossible situation: requested window ${downsampledRangeStart}-${downsampledRangeEnd} does not fit in canvas width ${canvas.width} as allowed by current scale factor ${scale}`)
+        // throw Error(`Impossible situation: requested window ${downsampledRangeStart}-${downsampledRangeEnd} does not fit in canvas width ${canvas.width} as allowed by current scale factor ${scale}`)
     }
 
     // Request can be served from cache--do so
